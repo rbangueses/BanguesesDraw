@@ -1,0 +1,452 @@
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
+use thiserror::Error;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectSummary {
+    pub name: String,
+    pub design_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DesignSummary {
+    pub project: String,
+    pub name: String,
+    pub file_name: String,
+    pub updated_at_ms: u128,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DesignScene {
+    pub project: String,
+    pub name: String,
+    pub file_name: String,
+    pub content: Value,
+}
+
+#[derive(Debug, Error)]
+pub enum DesignError {
+    #[error("invalid name: {0}")]
+    InvalidName(String),
+    #[error("not found: {0}")]
+    NotFound(String),
+    #[error("already exists: {0}")]
+    AlreadyExists(String),
+    #[error("invalid design file: {0}")]
+    InvalidDesignFile(String),
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+pub fn empty_scene() -> Value {
+    json!({
+        "type": "excalidraw",
+        "version": 2,
+        "source": "banguesesdraw",
+        "elements": [],
+        "appState": {},
+        "files": {}
+    })
+}
+
+const EXTENSION: &str = "excalidraw";
+
+fn ensure_root(root: &Path) -> Result<(), DesignError> {
+    fs::create_dir_all(root)?;
+    Ok(())
+}
+
+fn validate_name(name: &str) -> Result<String, DesignError> {
+    let trimmed = name.trim();
+    if trimmed.is_empty()
+        || trimmed == "."
+        || trimmed == ".."
+        || trimmed.contains('/')
+        || trimmed.contains('\\')
+        || trimmed.contains(':')
+    {
+        return Err(DesignError::InvalidName(name.to_string()));
+    }
+
+    Ok(trimmed.to_string())
+}
+
+fn design_file_name(name: &str) -> Result<String, DesignError> {
+    let clean = validate_name(name)?;
+    let suffix = format!(".{EXTENSION}");
+    if clean.ends_with(&suffix) {
+        Ok(clean)
+    } else {
+        Ok(format!("{clean}{suffix}"))
+    }
+}
+
+fn design_name_from_file(file_name: &str) -> String {
+    file_name
+        .strip_suffix(&format!(".{EXTENSION}"))
+        .unwrap_or(file_name)
+        .to_string()
+}
+
+fn project_path(root: &Path, project: &str) -> Result<PathBuf, DesignError> {
+    Ok(root.join(validate_name(project)?))
+}
+
+fn design_path(root: &Path, project: &str, file_name: &str) -> Result<PathBuf, DesignError> {
+    let project_dir = project_path(root, project)?;
+    let file_name = design_file_name(file_name)?;
+    Ok(project_dir.join(file_name))
+}
+
+fn modified_ms(path: &Path) -> u128 {
+    fs::metadata(path)
+        .and_then(|metadata| metadata.modified())
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0)
+}
+
+fn project_summary(path: &Path) -> Result<ProjectSummary, DesignError> {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| DesignError::InvalidName(path.display().to_string()))?
+        .to_string();
+    let design_count = fs::read_dir(path)?
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry.path().extension().and_then(|extension| extension.to_str()) == Some(EXTENSION)
+        })
+        .count();
+
+    Ok(ProjectSummary { name, design_count })
+}
+
+fn validate_scene(value: &Value) -> Result<(), DesignError> {
+    if value.get("type").and_then(Value::as_str) != Some("excalidraw") {
+        return Err(DesignError::InvalidDesignFile(
+            "missing type=excalidraw".to_string(),
+        ));
+    }
+
+    if !value.get("elements").is_some_and(Value::is_array) {
+        return Err(DesignError::InvalidDesignFile(
+            "missing elements array".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+pub fn list_projects(root: &Path) -> Result<Vec<ProjectSummary>, DesignError> {
+    ensure_root(root)?;
+    let mut projects = fs::read_dir(root)?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| project_summary(&entry.path()))
+        .collect::<Result<Vec<_>, _>>()?;
+    projects.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(projects)
+}
+
+pub fn create_project(root: &Path, name: &str) -> Result<ProjectSummary, DesignError> {
+    ensure_root(root)?;
+    let path = project_path(root, name)?;
+    if path.exists() {
+        return Err(DesignError::AlreadyExists(name.to_string()));
+    }
+
+    fs::create_dir(&path)?;
+    project_summary(&path)
+}
+
+pub fn rename_project(
+    root: &Path,
+    old_name: &str,
+    new_name: &str,
+) -> Result<ProjectSummary, DesignError> {
+    let old_path = project_path(root, old_name)?;
+    let new_path = project_path(root, new_name)?;
+    if !old_path.exists() {
+        return Err(DesignError::NotFound(old_name.to_string()));
+    }
+    if new_path.exists() {
+        return Err(DesignError::AlreadyExists(new_name.to_string()));
+    }
+
+    fs::rename(old_path, &new_path)?;
+    project_summary(&new_path)
+}
+
+pub fn delete_project(root: &Path, name: &str) -> Result<(), DesignError> {
+    let path = project_path(root, name)?;
+    if !path.exists() {
+        return Err(DesignError::NotFound(name.to_string()));
+    }
+
+    fs::remove_dir_all(path)?;
+    Ok(())
+}
+
+pub fn duplicate_project(
+    root: &Path,
+    source_name: &str,
+    target_name: &str,
+) -> Result<ProjectSummary, DesignError> {
+    let source = project_path(root, source_name)?;
+    let target = project_path(root, target_name)?;
+    if !source.exists() {
+        return Err(DesignError::NotFound(source_name.to_string()));
+    }
+    if target.exists() {
+        return Err(DesignError::AlreadyExists(target_name.to_string()));
+    }
+
+    fs::create_dir(&target)?;
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        if entry.path().is_file() {
+            fs::copy(entry.path(), target.join(entry.file_name()))?;
+        }
+    }
+
+    project_summary(&target)
+}
+
+pub fn list_designs(root: &Path, project: &str) -> Result<Vec<DesignSummary>, DesignError> {
+    let project_dir = project_path(root, project)?;
+    if !project_dir.exists() {
+        return Err(DesignError::NotFound(project.to_string()));
+    }
+
+    let mut designs = fs::read_dir(&project_dir)?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().is_file())
+        .filter(|entry| {
+            entry.path().extension().and_then(|extension| extension.to_str()) == Some(EXTENSION)
+        })
+        .map(|entry| {
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            Ok(DesignSummary {
+                project: project.to_string(),
+                name: design_name_from_file(&file_name),
+                file_name,
+                updated_at_ms: modified_ms(&entry.path()),
+            })
+        })
+        .collect::<Result<Vec<_>, DesignError>>()?;
+    designs.sort_by(|a, b| b.updated_at_ms.cmp(&a.updated_at_ms));
+    Ok(designs)
+}
+
+pub fn create_design(root: &Path, project: &str, name: &str) -> Result<DesignScene, DesignError> {
+    let path = design_path(root, project, name)?;
+    if path.exists() {
+        return Err(DesignError::AlreadyExists(name.to_string()));
+    }
+
+    let content = empty_scene();
+    write_design(
+        root,
+        project,
+        path.file_name().unwrap().to_string_lossy().as_ref(),
+        &content,
+    )
+}
+
+pub fn read_design(root: &Path, project: &str, file_name: &str) -> Result<DesignScene, DesignError> {
+    let path = design_path(root, project, file_name)?;
+    if !path.exists() {
+        return Err(DesignError::NotFound(file_name.to_string()));
+    }
+
+    let content: Value = serde_json::from_str(&fs::read_to_string(&path)?)?;
+    validate_scene(&content)?;
+    let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+    Ok(DesignScene {
+        project: project.to_string(),
+        name: design_name_from_file(&file_name),
+        file_name,
+        content,
+    })
+}
+
+pub fn write_design(
+    root: &Path,
+    project: &str,
+    file_name: &str,
+    content: &Value,
+) -> Result<DesignScene, DesignError> {
+    validate_scene(content)?;
+    let path = design_path(root, project, file_name)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| DesignError::InvalidName(file_name.to_string()))?;
+    if !parent.exists() {
+        return Err(DesignError::NotFound(project.to_string()));
+    }
+
+    let tmp_path = path.with_extension(format!("{EXTENSION}.tmp"));
+    fs::write(&tmp_path, serde_json::to_string_pretty(content)?)?;
+    fs::rename(&tmp_path, &path)?;
+    read_design(root, project, path.file_name().unwrap().to_string_lossy().as_ref())
+}
+
+pub fn rename_design(
+    root: &Path,
+    project: &str,
+    old_file_name: &str,
+    new_name: &str,
+) -> Result<DesignSummary, DesignError> {
+    let old_path = design_path(root, project, old_file_name)?;
+    let new_path = design_path(root, project, new_name)?;
+    if !old_path.exists() {
+        return Err(DesignError::NotFound(old_file_name.to_string()));
+    }
+    if new_path.exists() {
+        return Err(DesignError::AlreadyExists(new_name.to_string()));
+    }
+
+    fs::rename(old_path, &new_path)?;
+    let file_name = new_path.file_name().unwrap().to_string_lossy().to_string();
+    Ok(DesignSummary {
+        project: project.to_string(),
+        name: design_name_from_file(&file_name),
+        file_name,
+        updated_at_ms: modified_ms(&new_path),
+    })
+}
+
+pub fn duplicate_design(
+    root: &Path,
+    project: &str,
+    source_file_name: &str,
+    target_name: &str,
+) -> Result<DesignSummary, DesignError> {
+    let source = design_path(root, project, source_file_name)?;
+    let target = design_path(root, project, target_name)?;
+    if !source.exists() {
+        return Err(DesignError::NotFound(source_file_name.to_string()));
+    }
+    if target.exists() {
+        return Err(DesignError::AlreadyExists(target_name.to_string()));
+    }
+
+    fs::copy(&source, &target)?;
+    let file_name = target.file_name().unwrap().to_string_lossy().to_string();
+    Ok(DesignSummary {
+        project: project.to_string(),
+        name: design_name_from_file(&file_name),
+        file_name,
+        updated_at_ms: modified_ms(&target),
+    })
+}
+
+pub fn delete_design(root: &Path, project: &str, file_name: &str) -> Result<(), DesignError> {
+    let path = design_path(root, project, file_name)?;
+    if !path.exists() {
+        return Err(DesignError::NotFound(file_name.to_string()));
+    }
+
+    fs::remove_file(path)?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_root(label: &str) -> PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("banguesesdraw-{label}-{stamp}"))
+    }
+
+    #[test]
+    fn creates_and_lists_projects() {
+        let root = test_root("projects");
+        let project = create_project(&root, "Client Sketches").unwrap();
+        assert_eq!(project.name, "Client Sketches");
+        assert_eq!(project.design_count, 0);
+
+        let projects = list_projects(&root).unwrap();
+        assert_eq!(projects, vec![project]);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_path_traversal_names() {
+        let root = test_root("traversal");
+        let err = create_project(&root, "../bad").unwrap_err();
+        assert!(matches!(err, DesignError::InvalidName(_)));
+    }
+
+    #[test]
+    fn refuses_project_name_conflicts() {
+        let root = test_root("conflict");
+        create_project(&root, "Plans").unwrap();
+        let err = create_project(&root, "Plans").unwrap_err();
+        assert!(matches!(err, DesignError::AlreadyExists(_)));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn creates_reads_writes_and_lists_designs() {
+        let root = test_root("designs");
+        create_project(&root, "App").unwrap();
+        let created = create_design(&root, "App", "First Flow").unwrap();
+        assert_eq!(created.file_name, "First Flow.excalidraw");
+        assert_eq!(created.content["type"], "excalidraw");
+
+        let updated = json!({
+            "type": "excalidraw",
+            "version": 2,
+            "source": "test",
+            "elements": [{"id": "box-1", "type": "rectangle"}],
+            "appState": {},
+            "files": {}
+        });
+        write_design(&root, "App", "First Flow.excalidraw", &updated).unwrap();
+
+        let read = read_design(&root, "App", "First Flow.excalidraw").unwrap();
+        assert_eq!(read.content["elements"][0]["id"], "box-1");
+
+        let designs = list_designs(&root, "App").unwrap();
+        assert_eq!(designs.len(), 1);
+        assert_eq!(designs[0].name, "First Flow");
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rename_duplicate_and_delete_designs_preserve_originals() {
+        let root = test_root("rename-duplicate");
+        create_project(&root, "Ideas").unwrap();
+        create_design(&root, "Ideas", "Sketch").unwrap();
+
+        let renamed = rename_design(&root, "Ideas", "Sketch.excalidraw", "Sketch v2").unwrap();
+        assert_eq!(renamed.file_name, "Sketch v2.excalidraw");
+
+        let duplicated = duplicate_design(&root, "Ideas", "Sketch v2.excalidraw", "Copy").unwrap();
+        assert_eq!(duplicated.file_name, "Copy.excalidraw");
+
+        delete_design(&root, "Ideas", "Copy.excalidraw").unwrap();
+        let designs = list_designs(&root, "Ideas").unwrap();
+        assert_eq!(designs.len(), 1);
+        assert_eq!(designs[0].file_name, "Sketch v2.excalidraw");
+
+        fs::remove_dir_all(root).unwrap();
+    }
+}

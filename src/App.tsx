@@ -3,6 +3,7 @@ import { AppShell } from "./components/AppShell";
 import { EditorView } from "./components/EditorView";
 import { LibraryView } from "./components/LibraryView";
 import { designApi } from "./lib/designApi";
+import { prepareSceneForExcalidraw } from "./lib/excalidrawScene";
 import { isExcalidrawScene } from "./lib/sceneValidation";
 import type { ExcalidrawScene } from "./types/excalidraw";
 
@@ -26,7 +27,11 @@ export default function App() {
         throw new Error("Invalid Excalidraw scene.");
       }
 
-      setOpenDesign({ project, fileName, initialScene: design.content });
+      setOpenDesign({
+        project,
+        fileName,
+        initialScene: prepareSceneForExcalidraw(design.content),
+      });
     } catch (error) {
       setOpenError(`${fileName}: ${String(error)}`);
     }

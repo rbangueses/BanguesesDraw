@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import { prepareSceneForExcalidraw, prepareSceneForStorage } from "./excalidrawScene";
+
+describe("Excalidraw scene normalization", () => {
+  it("removes runtime-only appState before storage", () => {
+    const scene = prepareSceneForStorage({
+      type: "excalidraw",
+      elements: [{ id: "rect" }],
+      appState: {
+        collaborators: new Map(),
+        selectedElementIds: { rect: true },
+        viewBackgroundColor: "#ffffff",
+        zoom: { value: 1 },
+      },
+      files: {},
+    });
+
+    expect(scene.appState).toEqual({
+      viewBackgroundColor: "#ffffff",
+      zoom: { value: 1 },
+    });
+  });
+
+  it("normalizes reopened scenes that already contain JSON-serialized runtime state", () => {
+    const scene = prepareSceneForExcalidraw({
+      type: "excalidraw",
+      elements: [],
+      appState: {
+        collaborators: {},
+        editingTextElement: null,
+        viewBackgroundColor: "#f8f9fa",
+      },
+      files: {},
+    });
+
+    expect(scene.appState).toEqual({ viewBackgroundColor: "#f8f9fa" });
+  });
+});

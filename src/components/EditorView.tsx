@@ -4,6 +4,10 @@ import { ArrowLeft, Copy, Pencil, Save } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAutosave } from "../hooks/useAutosave";
 import { designApi } from "../lib/designApi";
+import {
+  prepareSceneForExcalidraw,
+  prepareSceneForStorage,
+} from "../lib/excalidrawScene";
 import { isExcalidrawScene } from "../lib/sceneValidation";
 import type { ExcalidrawScene } from "../types/excalidraw";
 import { RenameDialog } from "./RenameDialog";
@@ -55,9 +59,10 @@ export function EditorView({
     setLoadedSceneKey(null);
 
     if (initialScene) {
-      latestSceneRef.current = initialScene;
-      setInitialData(initialScene);
-      setAutosaveScene(initialScene);
+      const preparedScene = prepareSceneForExcalidraw(initialScene);
+      latestSceneRef.current = preparedScene;
+      setInitialData(preparedScene);
+      setAutosaveScene(preparedScene);
       setLoadedSceneKey(sceneKey);
       return () => {
         cancelled = true;
@@ -73,9 +78,10 @@ export function EditorView({
         }
 
         if (!cancelled) {
-          latestSceneRef.current = design.content;
-          setInitialData(design.content);
-          setAutosaveScene(design.content);
+          const preparedScene = prepareSceneForExcalidraw(design.content);
+          latestSceneRef.current = preparedScene;
+          setInitialData(preparedScene);
+          setAutosaveScene(preparedScene);
           setLoadedSceneKey(sceneKey);
         }
       } catch (unknownError) {
@@ -144,14 +150,14 @@ export function EditorView({
       files: Record<string, unknown>,
     ) => {
       const currentScene = latestSceneRef.current;
-      const nextScene: ExcalidrawScene = {
+      const nextScene = prepareSceneForStorage({
         type: "excalidraw",
         version: currentScene?.version,
         source: currentScene?.source,
         elements: elements as unknown[],
         appState,
         files,
-      };
+      });
 
       latestSceneRef.current = nextScene;
       setAutosaveScene(nextScene);

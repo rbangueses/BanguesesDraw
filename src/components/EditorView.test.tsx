@@ -38,7 +38,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
               editCount += 1;
               onChange(
                 [{ id: `changed-${editCount}` }],
-                { viewBackgroundColor: "#fff" },
+                { collaborators: new Map(), viewBackgroundColor: "#fff" },
                 {},
               );
             }}
@@ -134,6 +134,7 @@ describe("EditorView", () => {
       expect.objectContaining({
         type: "excalidraw",
         elements: [{ id: "changed-1" }],
+        appState: { viewBackgroundColor: "#fff" },
       }),
     );
   });

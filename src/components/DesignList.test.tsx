@@ -13,6 +13,8 @@ describe("DesignList", () => {
         filter="site"
         onFilterChange={vi.fn()}
         onCreateDesign={vi.fn()}
+        onImportDesign={vi.fn()}
+        onExportDesign={vi.fn()}
         onRenameDesign={vi.fn()}
         onDuplicateDesign={vi.fn()}
         onDeleteDesign={vi.fn()}
@@ -33,6 +35,8 @@ describe("DesignList", () => {
         filter=""
         onFilterChange={vi.fn()}
         onCreateDesign={vi.fn()}
+        onImportDesign={vi.fn()}
+        onExportDesign={vi.fn()}
         onRenameDesign={vi.fn()}
         onDuplicateDesign={vi.fn()}
         onDeleteDesign={vi.fn()}
@@ -46,6 +50,7 @@ describe("DesignList", () => {
   it("routes action-button clicks without opening the design", async () => {
     const user = userEvent.setup();
     const onOpenDesign = vi.fn();
+    const onExportDesign = vi.fn();
     const onDeleteDesign = vi.fn();
     const design = {
       project: "App",
@@ -62,6 +67,8 @@ describe("DesignList", () => {
         filter=""
         onFilterChange={vi.fn()}
         onCreateDesign={vi.fn()}
+        onImportDesign={vi.fn()}
+        onExportDesign={onExportDesign}
         onRenameDesign={vi.fn()}
         onDuplicateDesign={vi.fn()}
         onDeleteDesign={onDeleteDesign}
@@ -73,5 +80,36 @@ describe("DesignList", () => {
 
     expect(onDeleteDesign).toHaveBeenCalledWith(design);
     expect(onOpenDesign).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Export Flow" }));
+
+    expect(onExportDesign).toHaveBeenCalledWith(design);
+    expect(onOpenDesign).not.toHaveBeenCalled();
+  });
+
+  it("calls the import handler from the project header", async () => {
+    const user = userEvent.setup();
+    const onImportDesign = vi.fn();
+
+    render(
+      <DesignList
+        project="App"
+        designs={[]}
+        totalDesignCount={0}
+        filter=""
+        onFilterChange={vi.fn()}
+        onCreateDesign={vi.fn()}
+        onImportDesign={onImportDesign}
+        onExportDesign={vi.fn()}
+        onRenameDesign={vi.fn()}
+        onDuplicateDesign={vi.fn()}
+        onDeleteDesign={vi.fn()}
+        onOpenDesign={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Import design" }));
+
+    expect(onImportDesign).toHaveBeenCalledTimes(1);
   });
 });

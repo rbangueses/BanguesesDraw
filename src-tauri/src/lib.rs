@@ -81,8 +81,26 @@ fn delete_design(project: String, file_name: String) -> Result<(), String> {
     designs::delete_design(&designs_root(), &project, &file_name).map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn import_design(project: String, source_path: String) -> Result<DesignSummary, String> {
+    designs::import_design(&designs_root(), &project, &PathBuf::from(source_path))
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn export_design(project: String, file_name: String, target_path: String) -> Result<(), String> {
+    designs::export_design(
+        &designs_root(),
+        &project,
+        &file_name,
+        &PathBuf::from(target_path),
+    )
+    .map_err(|error| error.to_string())
+}
+
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             list_projects,
             create_project,
@@ -95,7 +113,9 @@ pub fn run() {
             write_design,
             rename_design,
             duplicate_design,
-            delete_design
+            delete_design,
+            import_design,
+            export_design
         ])
         .run(tauri::generate_context!())
         .expect("error while running BanguesesDraw");

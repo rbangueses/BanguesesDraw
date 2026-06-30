@@ -54,13 +54,19 @@ vi.mock("@excalidraw/excalidraw", () => ({
 vi.mock("lucide-react", () => ({
   ArrowLeft: () => <span aria-hidden="true">arrow</span>,
   Copy: () => <span aria-hidden="true">copy</span>,
+  Download: () => <span aria-hidden="true">download</span>,
   Pencil: () => <span aria-hidden="true">pencil</span>,
   Save: () => <span aria-hidden="true">save</span>,
+}));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  save: vi.fn(),
 }));
 
 vi.mock("../lib/designApi", () => ({
   designApi: {
     duplicateDesign: vi.fn(),
+    exportDesign: vi.fn(),
     readDesign: vi.fn(),
     renameDesign: vi.fn(),
     writeDesign: vi.fn(),
@@ -68,6 +74,7 @@ vi.mock("../lib/designApi", () => ({
 }));
 
 const { designApi } = await import("../lib/designApi");
+const { save } = await import("@tauri-apps/plugin-dialog");
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
@@ -89,7 +96,9 @@ describe("EditorView", () => {
     vi.mocked(designApi.readDesign).mockReset();
     vi.mocked(designApi.renameDesign).mockReset();
     vi.mocked(designApi.duplicateDesign).mockReset();
+    vi.mocked(designApi.exportDesign).mockReset();
     vi.mocked(designApi.writeDesign).mockReset();
+    vi.mocked(save).mockReset();
   });
 
   it("flushes pending edits before leaving the editor", async () => {
@@ -511,5 +520,59 @@ describe("EditorView", () => {
       expect.objectContaining({ type: "excalidraw" }),
     );
     expect(dialog).not.toBeInTheDocument();
+  });
+
+  it("flushes pending edits before exporting from the editor", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(designApi.readDesign).mockResolvedValue({
+      project: "App",
+      name: "Flow",
+      fileName: "Flow.excalidraw",
+      content: { type: "excalidraw", elements: [], appState: {}, files: {} },
+    });
+    vi.mocked(designApi.writeDesign).mockResolvedValue({
+      project: "App",
+      name: "Flow",
+      fileName: "Flow.excalidraw",
+      content: {
+        type: "excalidraw",
+        elements: [{ id: "changed-1" }],
+        appState: { viewBackgroundColor: "#fff" },
+        files: {},
+      },
+    });
+    vi.mocked(save).mockResolvedValue("/tmp/Flow.excalidraw");
+    vi.mocked(designApi.exportDesign).mockResolvedValue(undefined);
+
+    render(
+      <EditorView
+        project="App"
+        fileName="Flow.excalidraw"
+        onBack={vi.fn()}
+        onDesignMoved={vi.fn()}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Edit scene" }));
+    await user.click(screen.getByRole("button", { name: "Export design" }));
+
+    await waitFor(() =>
+      expect(designApi.exportDesign).toHaveBeenCalledWith(
+        "App",
+        "Flow.excalidraw",
+        "/tmp/Flow.excalidraw",
+      ),
+    );
+    expect(designApi.writeDesign).toHaveBeenCalledWith(
+      "App",
+      "Flow.excalidraw",
+      expect.objectContaining({ elements: [{ id: "changed-1" }] }),
+    );
+    expect(save).toHaveBeenCalledWith({
+      title: "Export design",
+      defaultPath: "Flow.excalidraw",
+      filters: [{ name: "Excalidraw", extensions: ["excalidraw"] }],
+    });
   });
 });

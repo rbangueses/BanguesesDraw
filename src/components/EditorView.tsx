@@ -1,6 +1,7 @@
 import "@excalidraw/excalidraw/index.css";
 import { Excalidraw } from "@excalidraw/excalidraw";
-import { ArrowLeft, Copy, Pencil, Save } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { ArrowLeft, Copy, Download, Pencil, Save } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAutosave } from "../hooks/useAutosave";
 import { designApi } from "../lib/designApi";
@@ -197,6 +198,30 @@ export function EditorView({
     [fileName, getLatestSavedScene, onDesignMoved, project],
   );
 
+  const handleExport = useCallback(async () => {
+    const targetPath = await save({
+      title: "Export design",
+      defaultPath: fileName,
+      filters: [{ name: "Excalidraw", extensions: ["excalidraw"] }],
+    });
+
+    if (typeof targetPath !== "string") {
+      return;
+    }
+
+    setIsFileActionRunning(true);
+    setLoadError(null);
+
+    try {
+      await getLatestSavedScene();
+      await designApi.exportDesign(project, fileName, targetPath);
+    } catch (unknownError) {
+      setLoadError(String(unknownError));
+    } finally {
+      setIsFileActionRunning(false);
+    }
+  }, [fileName, getLatestSavedScene, project]);
+
   const isBusy = isLeaving || isFileActionRunning;
 
   return (
@@ -236,6 +261,16 @@ export function EditorView({
             disabled={isBusy || !initialData}
           >
             <Copy size={16} />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => void handleExport()}
+            aria-label="Export design"
+            title="Export design"
+            disabled={isBusy || !initialData}
+          >
+            <Download size={16} />
           </button>
           <span className={`save-status ${autosave.status}`}>{autosave.status}</span>
           <button

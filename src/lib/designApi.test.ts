@@ -43,4 +43,40 @@ describe("designApi", () => {
       content: scene,
     });
   });
+
+  it("calls import_design and export_design with selected paths", async () => {
+    const { designApi } = await import("./designApi");
+    invoke
+      .mockResolvedValueOnce({
+        project: "App",
+        name: "Imported",
+        fileName: "Imported.excalidraw",
+        updatedAtMs: 3,
+      })
+      .mockResolvedValueOnce(undefined);
+
+    await expect(
+      designApi.importDesign("App", "/tmp/Imported.excalidraw"),
+    ).resolves.toEqual({
+      project: "App",
+      name: "Imported",
+      fileName: "Imported.excalidraw",
+      updatedAtMs: 3,
+    });
+    await designApi.exportDesign(
+      "App",
+      "Flow.excalidraw",
+      "/tmp/Flow.excalidraw",
+    );
+
+    expect(invoke).toHaveBeenNthCalledWith(1, "import_design", {
+      project: "App",
+      sourcePath: "/tmp/Imported.excalidraw",
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, "export_design", {
+      project: "App",
+      fileName: "Flow.excalidraw",
+      targetPath: "/tmp/Flow.excalidraw",
+    });
+  });
 });

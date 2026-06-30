@@ -96,6 +96,15 @@ fn design_name_from_file(file_name: &str) -> String {
         .to_string()
 }
 
+fn design_name_from_path(path: &Path) -> Result<String, DesignError> {
+    let stem = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .ok_or_else(|| DesignError::InvalidName(path.display().to_string()))?;
+
+    validate_name(stem)
+}
+
 fn project_path(root: &Path, project: &str) -> Result<PathBuf, DesignError> {
     Ok(root.join(validate_name(project)?))
 }
@@ -104,6 +113,37 @@ fn design_path(root: &Path, project: &str, file_name: &str) -> Result<PathBuf, D
     let project_dir = project_path(root, project)?;
     let file_name = design_file_name(file_name)?;
     Ok(project_dir.join(file_name))
+}
+
+fn unique_design_path(
+    root: &Path,
+    project: &str,
+    preferred_name: &str,
+) -> Result<PathBuf, DesignError> {
+    let project_dir = project_path(root, project)?;
+    if !project_dir.exists() {
+        return Err(DesignError::NotFound(project.to_string()));
+    }
+
+    let preferred_name = validate_name(preferred_name)?;
+    let first = project_dir.join(design_file_name(&preferred_name)?);
+    if !first.exists() {
+        return Ok(first);
+    }
+
+    for index in 1.. {
+        let candidate_name = if index == 1 {
+            format!("{preferred_name} Copy")
+        } else {
+            format!("{preferred_name} Copy {index}")
+        };
+        let candidate = project_dir.join(design_file_name(&candidate_name)?);
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    unreachable!("unique design name search is unbounded");
 }
 
 fn modified_ms(path: &Path) -> u128 {
@@ -369,6 +409,55 @@ pub fn duplicate_design(
     })
 }
 
+pub fn import_design(
+    root: &Path,
+    project: &str,
+    source_path: &Path,
+) -> Result<DesignSummary, DesignError> {
+    if !source_path.is_file() {
+        return Err(DesignError::NotFound(source_path.display().to_string()));
+    }
+
+    let content: Value = serde_json::from_str(&fs::read_to_string(source_path)?)?;
+    validate_scene(&content)?;
+
+    let preferred_name = design_name_from_path(source_path)?;
+    let target = unique_design_path(root, project, &preferred_name)?;
+    fs::write(&target, serde_json::to_string_pretty(&content)?)?;
+
+    let file_name = target.file_name().unwrap().to_string_lossy().to_string();
+    Ok(DesignSummary {
+        project: project.to_string(),
+        name: design_name_from_file(&file_name),
+        file_name,
+        updated_at_ms: modified_ms(&target),
+    })
+}
+
+pub fn export_design(
+    root: &Path,
+    project: &str,
+    file_name: &str,
+    target_path: &Path,
+) -> Result<(), DesignError> {
+    let source = design_path(root, project, file_name)?;
+    if !source.exists() {
+        return Err(DesignError::NotFound(file_name.to_string()));
+    }
+
+    let content: Value = serde_json::from_str(&fs::read_to_string(&source)?)?;
+    validate_scene(&content)?;
+
+    if let Some(parent) = target_path.parent() {
+        if !parent.exists() {
+            return Err(DesignError::NotFound(parent.display().to_string()));
+        }
+    }
+
+    fs::write(target_path, serde_json::to_string_pretty(&content)?)?;
+    Ok(())
+}
+
 pub fn delete_design(root: &Path, project: &str, file_name: &str) -> Result<(), DesignError> {
     let path = design_path(root, project, file_name)?;
     if !path.exists() {
@@ -594,5 +683,76 @@ mod tests {
         assert_eq!(designs[0].file_name, "Sketch v2.excalidraw");
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn exports_a_design_to_a_chosen_path() {
+        let root = test_root("export");
+        let target = root.join("Flow Export.excalidraw");
+        create_project(&root, "App").unwrap();
+
+        let scene = json!({
+            "type": "excalidraw",
+            "version": 2,
+            "source": "test",
+            "elements": [{"id": "box-1", "type": "rectangle"}],
+            "appState": {},
+            "files": {}
+        });
+        write_design(&root, "App", "Flow.excalidraw", &scene).unwrap();
+
+        export_design(&root, "App", "Flow.excalidraw", &target).unwrap();
+
+        let exported: Value = serde_json::from_str(&fs::read_to_string(&target).unwrap()).unwrap();
+        assert_eq!(exported["elements"][0]["id"], "box-1");
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn imports_a_design_into_the_selected_project_with_a_conflict_safe_name() {
+        let root = test_root("import");
+        let external_root = test_root("external-import");
+        fs::create_dir_all(&external_root).unwrap();
+        create_project(&root, "App").unwrap();
+        create_design(&root, "App", "Flow").unwrap();
+
+        let source = external_root.join("Flow.excalidraw");
+        let scene = json!({
+            "type": "excalidraw",
+            "version": 2,
+            "source": "test",
+            "elements": [{"id": "imported", "type": "ellipse"}],
+            "appState": {},
+            "files": {}
+        });
+        fs::write(&source, serde_json::to_string_pretty(&scene).unwrap()).unwrap();
+
+        let imported = import_design(&root, "App", &source).unwrap();
+
+        assert_eq!(imported.name, "Flow Copy");
+        assert_eq!(imported.file_name, "Flow Copy.excalidraw");
+        let read = read_design(&root, "App", &imported.file_name).unwrap();
+        assert_eq!(read.content["elements"][0]["id"], "imported");
+
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(external_root).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_import_files() {
+        let root = test_root("invalid-import");
+        let external_root = test_root("invalid-external-import");
+        fs::create_dir_all(&external_root).unwrap();
+        create_project(&root, "App").unwrap();
+
+        let source = external_root.join("Broken.excalidraw");
+        fs::write(&source, "{\"type\":\"not-excalidraw\"}").unwrap();
+
+        let err = import_design(&root, "App", &source).unwrap_err();
+        assert!(matches!(err, DesignError::InvalidDesignFile(_)));
+
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(external_root).unwrap();
     }
 }

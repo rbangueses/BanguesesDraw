@@ -37,4 +37,8 @@ export const designApi = {
     }),
   deleteDesign: (project: string, fileName: string) =>
     invoke<void>("delete_design", { project, fileName }),
+  importDesign: (project: string, sourcePath: string) =>
+    invoke<DesignSummary>("import_design", { project, sourcePath }),
+  exportDesign: (project: string, fileName: string, targetPath: string) =>
+    invoke<void>("export_design", { project, fileName, targetPath }),
 };

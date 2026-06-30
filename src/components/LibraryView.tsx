@@ -1,3 +1,4 @@
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { useDesignLibrary } from "../hooks/useDesignLibrary";
 import type { DesignSummary } from "../types/designs";
@@ -27,6 +28,36 @@ export function LibraryView({ openError, onOpenDesign }: LibraryViewProps) {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
 
   const closeDialog = () => setPendingAction(null);
+  const excalidrawImportFilters = [
+    { name: "Excalidraw", extensions: ["excalidraw", "json"] },
+  ];
+  const excalidrawExportFilters = [
+    { name: "Excalidraw", extensions: ["excalidraw"] },
+  ];
+
+  const handleImportDesign = async () => {
+    const sourcePath = await open({
+      title: "Import design",
+      multiple: false,
+      filters: excalidrawImportFilters,
+    });
+
+    if (typeof sourcePath === "string") {
+      await library.importDesign(sourcePath);
+    }
+  };
+
+  const handleExportDesign = async (design: DesignSummary) => {
+    const targetPath = await save({
+      title: "Export design",
+      defaultPath: design.fileName,
+      filters: excalidrawExportFilters,
+    });
+
+    if (typeof targetPath === "string") {
+      await library.exportDesign(design.fileName, targetPath);
+    }
+  };
 
   return (
     <div className="library-view">
@@ -54,6 +85,12 @@ export function LibraryView({ openError, onOpenDesign }: LibraryViewProps) {
             filter={library.filter}
             onFilterChange={library.setFilter}
             onCreateDesign={() => setPendingAction({ type: "create-design" })}
+            onImportDesign={() => {
+              void handleImportDesign().catch(() => undefined);
+            }}
+            onExportDesign={(design) => {
+              void handleExportDesign(design).catch(() => undefined);
+            }}
             onRenameDesign={(design) => setPendingAction({ type: "rename-design", design })}
             onDuplicateDesign={(design) =>
               setPendingAction({ type: "duplicate-design", design })

@@ -11,6 +11,8 @@ vi.mock("../lib/designApi", () => ({
     duplicateProject: vi.fn(),
     deleteProject: vi.fn(),
     createDesign: vi.fn(),
+    importDesign: vi.fn(),
+    exportDesign: vi.fn(),
     renameDesign: vi.fn(),
     duplicateDesign: vi.fn(),
     deleteDesign: vi.fn(),
@@ -40,6 +42,8 @@ describe("useDesignLibrary", () => {
     vi.mocked(designApi.duplicateProject).mockReset();
     vi.mocked(designApi.deleteProject).mockReset();
     vi.mocked(designApi.createDesign).mockReset();
+    vi.mocked(designApi.importDesign).mockReset();
+    vi.mocked(designApi.exportDesign).mockReset();
     vi.mocked(designApi.renameDesign).mockReset();
     vi.mocked(designApi.duplicateDesign).mockReset();
     vi.mocked(designApi.deleteDesign).mockReset();
@@ -397,6 +401,38 @@ describe("useDesignLibrary", () => {
       "Flow Copy",
     );
     expect(designApi.deleteDesign).toHaveBeenCalledWith("App", "Flow.excalidraw");
+  });
+
+  it("imports and exports designs through the selected project", async () => {
+    vi.mocked(designApi.listProjects).mockResolvedValue([{ name: "App", designCount: 1 }]);
+    vi.mocked(designApi.listDesigns).mockResolvedValue([
+      { project: "App", name: "Flow", fileName: "Flow.excalidraw", updatedAtMs: 1 },
+    ]);
+    vi.mocked(designApi.importDesign).mockResolvedValue({
+      project: "App",
+      name: "Imported",
+      fileName: "Imported.excalidraw",
+      updatedAtMs: 2,
+    });
+    vi.mocked(designApi.exportDesign).mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useDesignLibrary());
+    await waitFor(() => expect(result.current.selectedProject).toBe("App"));
+
+    await act(async () => {
+      await result.current.importDesign("/tmp/Imported.excalidraw");
+      await result.current.exportDesign("Flow.excalidraw", "/tmp/Flow.excalidraw");
+    });
+
+    expect(designApi.importDesign).toHaveBeenCalledWith(
+      "App",
+      "/tmp/Imported.excalidraw",
+    );
+    expect(designApi.exportDesign).toHaveBeenCalledWith(
+      "App",
+      "Flow.excalidraw",
+      "/tmp/Flow.excalidraw",
+    );
   });
 
   it("selects the duplicated project after the API succeeds", async () => {

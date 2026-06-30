@@ -53,6 +53,12 @@ input {
   gap: 12px;
 }
 
+.design-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .sidebar-header h1,
 .design-panel h2 {
   margin: 0;

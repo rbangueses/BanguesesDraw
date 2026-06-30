@@ -7,7 +7,13 @@ vi.mock("../hooks/useDesignLibrary", () => ({
   useDesignLibrary: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: vi.fn(),
+  save: vi.fn(),
+}));
+
 const { useDesignLibrary } = await import("../hooks/useDesignLibrary");
+const { open, save } = await import("@tauri-apps/plugin-dialog");
 
 function makeLibraryState() {
   return {
@@ -41,6 +47,8 @@ function makeLibraryState() {
     duplicateProject: vi.fn(),
     deleteProject: vi.fn(),
     createDesign: vi.fn(),
+    importDesign: vi.fn(),
+    exportDesign: vi.fn(),
     renameDesign: vi.fn(),
     duplicateDesign: vi.fn(),
     deleteDesign: vi.fn(),
@@ -50,6 +58,8 @@ function makeLibraryState() {
 describe("LibraryView", () => {
   beforeEach(() => {
     vi.mocked(useDesignLibrary).mockReset();
+    vi.mocked(open).mockReset();
+    vi.mocked(save).mockReset();
   });
 
   it("opens the create project dialog and submits through an accessibly named input", async () => {
@@ -150,5 +160,55 @@ describe("LibraryView", () => {
     );
     expect(screen.getByRole("dialog", { name: "Delete project" })).toBeVisible();
     expect(library.deleteProject).toHaveBeenCalledWith("App");
+  });
+
+  it("imports a chosen design file into the selected project", async () => {
+    const user = userEvent.setup();
+    const library = makeLibraryState();
+    library.importDesign.mockResolvedValue({
+      project: "App",
+      name: "Imported",
+      fileName: "Imported.excalidraw",
+      updatedAtMs: 2,
+    });
+    vi.mocked(open).mockResolvedValue("/tmp/Imported.excalidraw");
+    vi.mocked(useDesignLibrary).mockReturnValue(library);
+
+    render(<LibraryView onOpenDesign={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Import design" }));
+
+    await waitFor(() =>
+      expect(library.importDesign).toHaveBeenCalledWith("/tmp/Imported.excalidraw"),
+    );
+    expect(open).toHaveBeenCalledWith({
+      title: "Import design",
+      multiple: false,
+      filters: [{ name: "Excalidraw", extensions: ["excalidraw", "json"] }],
+    });
+  });
+
+  it("exports a design to the chosen file path", async () => {
+    const user = userEvent.setup();
+    const library = makeLibraryState();
+    library.exportDesign.mockResolvedValue(undefined);
+    vi.mocked(save).mockResolvedValue("/tmp/Flow.excalidraw");
+    vi.mocked(useDesignLibrary).mockReturnValue(library);
+
+    render(<LibraryView onOpenDesign={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Export Flow" }));
+
+    await waitFor(() =>
+      expect(library.exportDesign).toHaveBeenCalledWith(
+        "Flow.excalidraw",
+        "/tmp/Flow.excalidraw",
+      ),
+    );
+    expect(save).toHaveBeenCalledWith({
+      title: "Export design",
+      defaultPath: "Flow.excalidraw",
+      filters: [{ name: "Excalidraw", extensions: ["excalidraw"] }],
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { Copy, FilePlus2, Pencil, Trash2 } from "lucide-react";
+import { Copy, Download, FilePlus2, Pencil, Trash2, Upload } from "lucide-react";
 import type { DesignSummary } from "../types/designs";
 
 type DesignListProps = {
@@ -8,6 +8,8 @@ type DesignListProps = {
   filter: string;
   onFilterChange: (filter: string) => void;
   onCreateDesign: () => void;
+  onImportDesign: () => void;
+  onExportDesign: (design: DesignSummary) => void;
   onRenameDesign: (design: DesignSummary) => void;
   onDuplicateDesign: (design: DesignSummary) => void;
   onDeleteDesign: (design: DesignSummary) => void;
@@ -21,6 +23,8 @@ export function DesignList({
   filter,
   onFilterChange,
   onCreateDesign,
+  onImportDesign,
+  onExportDesign,
   onRenameDesign,
   onDuplicateDesign,
   onDeleteDesign,
@@ -37,10 +41,16 @@ export function DesignList({
           <p className="eyebrow">Project</p>
           <h2>{project}</h2>
         </div>
-        <button type="button" onClick={onCreateDesign}>
-          <FilePlus2 size={16} />
-          New design
-        </button>
+        <div className="design-header-actions">
+          <button type="button" onClick={onImportDesign}>
+            <Upload size={16} />
+            Import design
+          </button>
+          <button type="button" onClick={onCreateDesign}>
+            <FilePlus2 size={16} />
+            New design
+          </button>
+        </div>
       </header>
       <input
         className="filter-input"
@@ -71,6 +81,18 @@ export function DesignList({
                 <span>{new Date(Number(design.updatedAtMs)).toLocaleString()}</span>
               </button>
               <div className="row-actions">
+                <button
+                  type="button"
+                  className="icon-button row-action-button"
+                  aria-label={`Export ${design.name}`}
+                  title={`Export ${design.name}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onExportDesign(design);
+                  }}
+                >
+                  <Download size={16} />
+                </button>
                 <button
                   type="button"
                   className="icon-button row-action-button"

@@ -25,6 +25,8 @@ type UseDesignLibraryResult = {
     targetName: string,
   ) => Promise<DesignSummary | null>;
   deleteDesign: (fileName: string) => Promise<void>;
+  importDesign: (sourcePath: string) => Promise<DesignSummary | null>;
+  exportDesign: (fileName: string, targetPath: string) => Promise<void>;
 };
 
 function getErrorMessage(error: unknown) {
@@ -252,6 +254,17 @@ export function useDesignLibrary(): UseDesignLibraryResult {
       await withProject(async (project) => {
         await designApi.deleteDesign(project, fileName);
         await loadDesigns(project);
+      });
+    },
+    importDesign: async (sourcePath) =>
+      withProject(async (project) => {
+        const design = await designApi.importDesign(project, sourcePath);
+        await loadDesigns(project);
+        return design;
+      }),
+    exportDesign: async (fileName, targetPath) => {
+      await withProject(async (project) => {
+        await designApi.exportDesign(project, fileName, targetPath);
       });
     },
   };

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorView } from "./EditorView";
@@ -40,6 +40,18 @@ vi.mock("../lib/designApi", () => ({
 }));
 
 const { designApi } = await import("../lib/designApi");
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
+}
 
 describe("EditorView", () => {
   beforeEach(() => {
@@ -109,5 +121,65 @@ describe("EditorView", () => {
 
     await screen.findByText("Error: Disk full");
     expect(onBack).not.toHaveBeenCalled();
+  });
+
+  it("waits for an in-flight autosave before leaving without starting another write", async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+    const deferred = createDeferred<{
+      project: string;
+      name: string;
+      fileName: string;
+      content: {
+        type: "excalidraw";
+        elements: unknown[];
+        appState: Record<string, unknown>;
+        files: Record<string, unknown>;
+      };
+    }>();
+
+    vi.mocked(designApi.readDesign).mockResolvedValue({
+      project: "App",
+      name: "Flow",
+      fileName: "Flow.excalidraw",
+      content: { type: "excalidraw", elements: [], appState: {}, files: {} },
+    });
+    vi.mocked(designApi.writeDesign).mockReturnValue(deferred.promise);
+
+    render(
+      <EditorView project="App" fileName="Flow.excalidraw" onBack={onBack} />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Edit scene" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const saveButton = screen.getByRole("button", { name: "Save" });
+    const backButton = screen.getByRole("button", { name: "Back to library" });
+
+    expect(designApi.writeDesign).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("saving")).toBeVisible();
+    expect(saveButton).toBeDisabled();
+
+    await user.click(backButton);
+
+    expect(designApi.writeDesign).toHaveBeenCalledTimes(1);
+    expect(onBack).not.toHaveBeenCalled();
+
+    await act(async () => {
+      deferred.resolve({
+        project: "App",
+        name: "Flow",
+        fileName: "Flow.excalidraw",
+        content: {
+          type: "excalidraw",
+          elements: [{ id: "changed" }],
+          appState: { viewBackgroundColor: "#fff" },
+          files: {},
+        },
+      });
+      await Promise.resolve();
+    });
+
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });

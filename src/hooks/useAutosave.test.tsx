@@ -12,6 +12,18 @@ vi.mock("../lib/designApi", () => ({
 
 const { designApi } = await import("../lib/designApi");
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
+}
+
 describe("useAutosave", () => {
   beforeEach(() => {
     vi.mocked(designApi.writeDesign).mockReset();
@@ -117,6 +129,76 @@ describe("useAutosave", () => {
       "Flow.excalidraw",
       updatedScene,
     );
+  });
+
+  it("does not duplicate writes when saveNow is called while saving", async () => {
+    const deferred = createDeferred<{
+      project: string;
+      name: string;
+      fileName: string;
+      content: { type: "excalidraw"; elements: unknown[]; appState: {}; files: {} };
+    }>();
+
+    vi.mocked(designApi.writeDesign).mockReturnValue(deferred.promise);
+
+    const { rerender, result } = renderHook(
+      ({ scene }) =>
+        useAutosave({
+          project: "App",
+          fileName: "Flow.excalidraw",
+          scene,
+          enabled: true,
+        }),
+      {
+        initialProps: {
+          scene: {
+            type: "excalidraw" as const,
+            elements: [] as unknown[],
+            appState: {},
+            files: {},
+          },
+        },
+      },
+    );
+
+    const updatedScene = {
+      type: "excalidraw" as const,
+      elements: [{ id: "a" }] as unknown[],
+      appState: {},
+      files: {},
+    };
+
+    rerender({ scene: updatedScene });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+
+    expect(result.current.status).toBe("saving");
+    expect(designApi.writeDesign).toHaveBeenCalledTimes(1);
+
+    let manualSaveResult: Promise<boolean> | undefined;
+
+    await act(async () => {
+      manualSaveResult = result.current.saveNow();
+      await Promise.resolve();
+    });
+
+    expect(designApi.writeDesign).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe("saving");
+
+    deferred.resolve({
+      project: "App",
+      name: "Flow",
+      fileName: "Flow.excalidraw",
+      content: { type: "excalidraw", elements: [{ id: "a" }], appState: {}, files: {} },
+    });
+
+    await act(async () => {
+      await manualSaveResult;
+    });
+
+    expect(result.current.status).toBe("saved");
   });
 
   afterAll(() => {

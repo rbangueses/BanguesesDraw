@@ -51,3 +51,28 @@ Tests and commands run:
 
 Concerns:
 - Vite still reports large chunk warnings during build after bundling Excalidraw, but the build completes successfully.
+
+---
+
+Status: complete
+
+Commit:
+- `HEAD` `fix: prevent duplicate autosave writes`
+
+Files changed:
+- `src/components/EditorView.tsx`
+- `src/components/EditorView.test.tsx`
+- `src/hooks/useAutosave.ts`
+- `src/hooks/useAutosave.test.tsx`
+
+Tests and commands run:
+- `PATH="/Users/rbangueses/.cargo/bin:/Users/rbangueses/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH" npm run test:run -- src/hooks src/components src/App.test.tsx src/lib`
+  - initial red run failed as expected:
+    - `src/hooks/useAutosave.test.tsx`: `saveNow()` called `writeDesign` twice when invoked during an in-flight save
+    - `src/components/EditorView.test.tsx`: new saving-path regression coverage added and stabilized while exercising Back/Save behavior during `saving`
+  - final green run passed (`10` files, `26` tests)
+- `PATH="/Users/rbangueses/.cargo/bin:/Users/rbangueses/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH" npm run build`
+  - passed
+
+Concerns:
+- Vite still reports large chunk warnings during build after bundling Excalidraw, but the production build succeeds.

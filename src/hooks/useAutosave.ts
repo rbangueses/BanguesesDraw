@@ -21,6 +21,7 @@ export function useAutosave({
   const [error, setError] = useState<string | null>(null);
   const lastSaved = useRef<string | null>(null);
   const pendingTimeout = useRef<number | null>(null);
+  const inFlightSave = useRef<Promise<boolean> | null>(null);
   const sceneKey = `${project}/${fileName}`;
   const lastSceneKey = useRef(sceneKey);
 
@@ -51,19 +52,31 @@ export function useAutosave({
     }
 
     clearPendingTimeout();
+
+    if (inFlightSave.current) {
+      return inFlightSave.current;
+    }
+
     setStatus("saving");
     setError(null);
 
-    try {
-      await designApi.writeDesign(project, fileName, scene);
-      lastSaved.current = JSON.stringify(scene);
-      setStatus("saved");
-      return true;
-    } catch (unknownError) {
-      setError(String(unknownError));
-      setStatus("error");
-      return false;
-    }
+    const saveRequest = (async () => {
+      try {
+        await designApi.writeDesign(project, fileName, scene);
+        lastSaved.current = JSON.stringify(scene);
+        setStatus("saved");
+        return true;
+      } catch (unknownError) {
+        setError(String(unknownError));
+        setStatus("error");
+        return false;
+      } finally {
+        inFlightSave.current = null;
+      }
+    })();
+
+    inFlightSave.current = saveRequest;
+    return saveRequest;
   }, [clearPendingTimeout, fileName, project, scene]);
 
   useEffect(() => {

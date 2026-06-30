@@ -107,7 +107,7 @@ export function EditorView({ project, fileName, onBack }: EditorViewProps) {
             type="button"
             className="save-button"
             onClick={() => void autosave.saveNow()}
-            disabled={isLeaving}
+            disabled={isLeaving || autosave.status === "saving"}
           >
             <Save size={16} />
             Save

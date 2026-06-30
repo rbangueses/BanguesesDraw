@@ -26,3 +26,144 @@ input {
   display: grid;
   place-items: center;
 }
+
+.app-shell {
+  min-height: 100vh;
+  background: #f7f7f4;
+}
+
+.library-view {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.project-sidebar {
+  border-right: 1px solid #deded8;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.sidebar-header,
+.design-panel-header,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sidebar-header h1,
+.design-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+}
+
+.project-button,
+.design-row {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #202124;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-button.active,
+.project-button:hover,
+.design-row:hover {
+  background: #ecebe4;
+}
+
+.library-main {
+  padding: 24px;
+  min-width: 0;
+}
+
+.design-panel {
+  max-width: 980px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #676b73;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.filter-input {
+  width: 100%;
+  margin: 18px 0;
+  padding: 10px 12px;
+  border: 1px solid #d7d7d0;
+  border-radius: 6px;
+}
+
+.design-list {
+  border: 1px solid #deded8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.design-row {
+  border-radius: 0;
+  border-bottom: 1px solid #eeeeea;
+  background: #ffffff;
+}
+
+.design-row:last-child {
+  border-bottom: 0;
+}
+
+.empty-state,
+.error-banner {
+  border: 1px solid #deded8;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 24px;
+}
+
+.error-banner,
+.form-error {
+  color: #9b1c1c;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(32 33 36 / 35%);
+}
+
+.dialog {
+  width: min(420px, calc(100vw - 32px));
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.dialog input {
+  width: 100%;
+  padding: 10px 12px;
+}
+
+.danger-button {
+  color: #9b1c1c;
+}
+
+.editor-preview {
+  padding: 24px;
+}

@@ -1,7 +1,7 @@
 import "@excalidraw/excalidraw/index.css";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import { ArrowLeft, Save } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAutosave } from "../hooks/useAutosave";
 import { designApi } from "../lib/designApi";
 import { isExcalidrawScene } from "../lib/sceneValidation";
@@ -16,6 +16,7 @@ type EditorViewProps = {
 export function EditorView({ project, fileName, onBack }: EditorViewProps) {
   const [scene, setScene] = useState<ExcalidrawScene | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLeaving, setIsLeaving] = useState(false);
   const sceneKey = `${project}/${fileName}`;
   const [loadedSceneKey, setLoadedSceneKey] = useState<string | null>(null);
   const autosave = useAutosave({
@@ -60,15 +61,39 @@ export function EditorView({ project, fileName, onBack }: EditorViewProps) {
 
   const title = useMemo(() => fileName.replace(/\.excalidraw$/, ""), [fileName]);
 
+  const handleBack = useCallback(async () => {
+    if (isLeaving) {
+      return;
+    }
+
+    if (!scene || autosave.status === "saved") {
+      onBack();
+      return;
+    }
+
+    setIsLeaving(true);
+
+    try {
+      const didSave = await autosave.saveNow();
+
+      if (didSave) {
+        onBack();
+      }
+    } finally {
+      setIsLeaving(false);
+    }
+  }, [autosave, isLeaving, onBack, scene]);
+
   return (
     <div className="editor-view">
       <header className="editor-header">
         <button
           type="button"
           className="icon-button"
-          onClick={onBack}
+          onClick={() => void handleBack()}
           aria-label="Back to library"
           title="Back to library"
+          disabled={isLeaving}
         >
           <ArrowLeft size={18} />
         </button>
@@ -78,7 +103,12 @@ export function EditorView({ project, fileName, onBack }: EditorViewProps) {
         </div>
         <div className="save-cluster">
           <span className={`save-status ${autosave.status}`}>{autosave.status}</span>
-          <button type="button" className="save-button" onClick={() => void autosave.saveNow()}>
+          <button
+            type="button"
+            className="save-button"
+            onClick={() => void autosave.saveNow()}
+            disabled={isLeaving}
+          >
             <Save size={16} />
             Save
           </button>

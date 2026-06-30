@@ -20,25 +20,37 @@ export function useAutosave({
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [error, setError] = useState<string | null>(null);
   const lastSaved = useRef<string | null>(null);
+  const pendingTimeout = useRef<number | null>(null);
   const sceneKey = `${project}/${fileName}`;
   const lastSceneKey = useRef(sceneKey);
+
+  const clearPendingTimeout = useCallback(() => {
+    if (pendingTimeout.current === null) {
+      return;
+    }
+
+    window.clearTimeout(pendingTimeout.current);
+    pendingTimeout.current = null;
+  }, []);
 
   useEffect(() => {
     if (lastSceneKey.current === sceneKey) {
       return;
     }
 
+    clearPendingTimeout();
     lastSceneKey.current = sceneKey;
     lastSaved.current = null;
     setStatus("saved");
     setError(null);
-  }, [sceneKey]);
+  }, [clearPendingTimeout, sceneKey]);
 
   const saveNow = useCallback(async () => {
     if (!scene) {
-      return;
+      return false;
     }
 
+    clearPendingTimeout();
     setStatus("saving");
     setError(null);
 
@@ -46,11 +58,13 @@ export function useAutosave({
       await designApi.writeDesign(project, fileName, scene);
       lastSaved.current = JSON.stringify(scene);
       setStatus("saved");
+      return true;
     } catch (unknownError) {
       setError(String(unknownError));
       setStatus("error");
+      return false;
     }
-  }, [fileName, project, scene]);
+  }, [clearPendingTimeout, fileName, project, scene]);
 
   useEffect(() => {
     if (!enabled || !scene) {
@@ -71,12 +85,15 @@ export function useAutosave({
 
     setStatus("unsaved");
 
-    const timeout = window.setTimeout(() => {
+    pendingTimeout.current = window.setTimeout(() => {
+      pendingTimeout.current = null;
       void saveNow();
     }, 800);
 
-    return () => window.clearTimeout(timeout);
-  }, [enabled, saveNow, scene]);
+    return () => {
+      clearPendingTimeout();
+    };
+  }, [clearPendingTimeout, enabled, saveNow, scene]);
 
   return { status, saveNow, error };
 }

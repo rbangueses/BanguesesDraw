@@ -115,6 +115,10 @@ fn modified_ms(path: &Path) -> u128 {
         .unwrap_or(0)
 }
 
+fn is_scene_file(path: &Path) -> bool {
+    path.extension().and_then(|extension| extension.to_str()) == Some(EXTENSION)
+}
+
 fn project_summary(path: &Path) -> Result<ProjectSummary, DesignError> {
     let name = path
         .file_name()
@@ -123,15 +127,19 @@ fn project_summary(path: &Path) -> Result<ProjectSummary, DesignError> {
         .to_string();
     let design_count = fs::read_dir(path)?
         .filter_map(Result::ok)
-        .filter(|entry| {
-            entry.path().extension().and_then(|extension| extension.to_str()) == Some(EXTENSION)
-        })
+        .filter(|entry| is_scene_file(&entry.path()))
         .count();
 
     Ok(ProjectSummary { name, design_count })
 }
 
 fn validate_scene(value: &Value) -> Result<(), DesignError> {
+    if !value.is_object() {
+        return Err(DesignError::InvalidDesignFile(
+            "scene must be a JSON object".to_string(),
+        ));
+    }
+
     if value.get("type").and_then(Value::as_str) != Some("excalidraw") {
         return Err(DesignError::InvalidDesignFile(
             "missing type=excalidraw".to_string(),
@@ -141,6 +149,18 @@ fn validate_scene(value: &Value) -> Result<(), DesignError> {
     if !value.get("elements").is_some_and(Value::is_array) {
         return Err(DesignError::InvalidDesignFile(
             "missing elements array".to_string(),
+        ));
+    }
+
+    if !value.get("appState").is_some_and(Value::is_object) {
+        return Err(DesignError::InvalidDesignFile(
+            "missing appState object".to_string(),
+        ));
+    }
+
+    if !value.get("files").is_some_and(Value::is_object) {
+        return Err(DesignError::InvalidDesignFile(
+            "missing files object".to_string(),
         ));
     }
 
@@ -214,7 +234,7 @@ pub fn duplicate_project(
     fs::create_dir(&target)?;
     for entry in fs::read_dir(source)? {
         let entry = entry?;
-        if entry.path().is_file() {
+        if entry.file_type()?.is_file() && is_scene_file(&entry.path()) {
             fs::copy(entry.path(), target.join(entry.file_name()))?;
         }
     }
@@ -231,9 +251,7 @@ pub fn list_designs(root: &Path, project: &str) -> Result<Vec<DesignSummary>, De
     let mut designs = fs::read_dir(&project_dir)?
         .filter_map(Result::ok)
         .filter(|entry| entry.path().is_file())
-        .filter(|entry| {
-            entry.path().extension().and_then(|extension| extension.to_str()) == Some(EXTENSION)
-        })
+        .filter(|entry| is_scene_file(&entry.path()))
         .map(|entry| {
             let file_name = entry.file_name().to_string_lossy().to_string();
             Ok(DesignSummary {
@@ -403,6 +421,31 @@ mod tests {
     }
 
     #[test]
+    fn renames_duplicates_and_deletes_projects() {
+        let root = test_root("project-lifecycle");
+        create_project(&root, "Original").unwrap();
+        create_design(&root, "Original", "Home").unwrap();
+
+        let duplicated = duplicate_project(&root, "Original", "Original Copy").unwrap();
+        assert_eq!(duplicated.name, "Original Copy");
+        assert_eq!(duplicated.design_count, 1);
+        assert!(root.join("Original Copy").join("Home.excalidraw").exists());
+
+        let renamed = rename_project(&root, "Original Copy", "Archive").unwrap();
+        assert_eq!(renamed.name, "Archive");
+        assert_eq!(renamed.design_count, 1);
+        assert!(!root.join("Original Copy").exists());
+        assert!(root.join("Archive").exists());
+
+        delete_project(&root, "Archive").unwrap();
+        let projects = list_projects(&root).unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].name, "Original");
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn creates_reads_writes_and_lists_designs() {
         let root = test_root("designs");
         create_project(&root, "App").unwrap();
@@ -426,6 +469,109 @@ mod tests {
         let designs = list_designs(&root, "App").unwrap();
         assert_eq!(designs.len(), 1);
         assert_eq!(designs[0].name, "First Flow");
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_design_name_conflicts() {
+        let root = test_root("design-conflicts");
+        create_project(&root, "Ideas").unwrap();
+        create_design(&root, "Ideas", "Sketch").unwrap();
+        create_design(&root, "Ideas", "Other").unwrap();
+
+        let rename_err = rename_design(&root, "Ideas", "Sketch.excalidraw", "Other").unwrap_err();
+        assert!(matches!(rename_err, DesignError::AlreadyExists(_)));
+
+        let duplicate_err = duplicate_design(&root, "Ideas", "Sketch.excalidraw", "Other").unwrap_err();
+        assert!(matches!(duplicate_err, DesignError::AlreadyExists(_)));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_scenes_on_write_and_read() {
+        let root = test_root("invalid-scene");
+        create_project(&root, "App").unwrap();
+
+        let missing_app_state = json!({
+            "type": "excalidraw",
+            "version": 2,
+            "source": "test",
+            "elements": [],
+            "files": {}
+        });
+        let write_err = write_design(&root, "App", "Broken.excalidraw", &missing_app_state).unwrap_err();
+        assert!(matches!(write_err, DesignError::InvalidDesignFile(_)));
+
+        let invalid_on_disk = json!({
+            "type": "excalidraw",
+            "version": 2,
+            "source": "test",
+            "elements": [],
+            "appState": [],
+            "files": {}
+        });
+        fs::write(
+            root.join("App").join("Broken.excalidraw"),
+            serde_json::to_string_pretty(&invalid_on_disk).unwrap(),
+        )
+        .unwrap();
+
+        let read_err = read_design(&root, "App", "Broken.excalidraw").unwrap_err();
+        assert!(matches!(read_err, DesignError::InvalidDesignFile(_)));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn write_design_replaces_content_and_removes_temp_file() {
+        let root = test_root("write-replace");
+        create_project(&root, "App").unwrap();
+        create_design(&root, "App", "Flow").unwrap();
+
+        let first = json!({
+            "type": "excalidraw",
+            "version": 2,
+            "source": "test",
+            "elements": [{"id": "first", "type": "rectangle"}],
+            "appState": {},
+            "files": {}
+        });
+        write_design(&root, "App", "Flow.excalidraw", &first).unwrap();
+
+        let second = json!({
+            "type": "excalidraw",
+            "version": 2,
+            "source": "test",
+            "elements": [{"id": "second", "type": "ellipse"}],
+            "appState": {},
+            "files": {}
+        });
+        let written = write_design(&root, "App", "Flow.excalidraw", &second).unwrap();
+        assert_eq!(written.content["elements"][0]["id"], "second");
+        assert!(!root.join("App").join("Flow.excalidraw.tmp").exists());
+
+        let raw = fs::read_to_string(root.join("App").join("Flow.excalidraw")).unwrap();
+        assert!(raw.contains("\"second\""));
+        assert!(!raw.contains("\"first\""));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn duplicate_project_ignores_non_scene_files() {
+        let root = test_root("duplicate-project-filter");
+        create_project(&root, "Source").unwrap();
+        create_design(&root, "Source", "Scene").unwrap();
+        fs::write(root.join("Source").join("notes.txt"), "ignore me").unwrap();
+        fs::write(root.join("Source").join("Scene.excalidraw.tmp"), "temp").unwrap();
+
+        let duplicated = duplicate_project(&root, "Source", "Copy").unwrap();
+        assert_eq!(duplicated.design_count, 1);
+        assert!(root.join("Copy").join("Scene.excalidraw").exists());
+        assert!(!root.join("Copy").join("notes.txt").exists());
+        assert!(!root.join("Copy").join("Scene.excalidraw.tmp").exists());
 
         fs::remove_dir_all(root).unwrap();
     }

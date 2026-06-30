@@ -39,28 +39,49 @@ export function useDesignLibrary(): UseDesignLibraryResult {
   const [isLoading, setIsLoading] = useState(true);
   const [isDesignsLoading, setIsDesignsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const selectedProjectRef = useRef<string | null>(null);
   const designLoadRequestRef = useRef(0);
 
-  const loadProjects = useCallback(async () => {
+  const transitionSelectedProject = useCallback((project: string | null) => {
+    if (selectedProjectRef.current === project) {
+      return false;
+    }
+
+    designLoadRequestRef.current += 1;
+    selectedProjectRef.current = project;
+    setSelectedProject(project);
+    setDesigns([]);
+    setIsDesignsLoading(Boolean(project));
+
+    return true;
+  }, []);
+
+  const loadProjects = useCallback(async (preferredProject?: string | null) => {
     setIsLoading(true);
     setError(null);
 
     try {
       const loadedProjects = await designApi.listProjects();
+      const resolvedProject =
+        preferredProject && loadedProjects.some((project) => project.name === preferredProject)
+          ? preferredProject
+          : selectedProjectRef.current &&
+              loadedProjects.some(
+                (project) => project.name === selectedProjectRef.current,
+              )
+            ? selectedProjectRef.current
+            : loadedProjects[0]?.name ?? null;
+
       setProjects(loadedProjects);
-      setSelectedProject((current) =>
-        current && loadedProjects.some((project) => project.name === current)
-          ? current
-          : loadedProjects[0]?.name ?? null,
-      );
+      transitionSelectedProject(resolvedProject);
     } catch (loadError) {
       setProjects([]);
-      setSelectedProject(null);
+      transitionSelectedProject(null);
       setError(getErrorMessage(loadError));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [transitionSelectedProject]);
 
   const loadDesigns = useCallback(async (project: string | null) => {
     const requestId = designLoadRequestRef.current + 1;
@@ -118,15 +139,9 @@ export function useDesignLibrary(): UseDesignLibraryResult {
 
   const selectProject = useCallback(
     (project: string) => {
-      if (project === selectedProject) {
-        return;
-      }
-
-      setSelectedProject(project);
-      setDesigns([]);
-      setIsDesignsLoading(true);
+      transitionSelectedProject(project);
     },
-    [selectedProject],
+    [transitionSelectedProject],
   );
 
   const runProjectAction = useCallback(
@@ -176,15 +191,20 @@ export function useDesignLibrary(): UseDesignLibraryResult {
     createProject: (name) =>
       runProjectAction(async () => {
         const project = await designApi.createProject(name);
-        await loadProjects();
-        setSelectedProject(project.name);
+        transitionSelectedProject(project.name);
+        await loadProjects(project.name);
         return project;
       }),
     renameProject: (oldName, newName) =>
       runProjectAction(async () => {
         const project = await designApi.renameProject(oldName, newName);
-        await loadProjects();
-        setSelectedProject(project.name);
+        const shouldSelectProject = selectedProjectRef.current === oldName;
+
+        if (shouldSelectProject) {
+          transitionSelectedProject(project.name);
+        }
+
+        await loadProjects(shouldSelectProject ? project.name : undefined);
         return project;
       }),
     duplicateProject: (sourceName, targetName) =>

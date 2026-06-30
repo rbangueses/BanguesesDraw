@@ -181,6 +181,96 @@ describe("useDesignLibrary", () => {
     expect(designApi.createDesign).toHaveBeenCalledWith("Ideas", "Sketch");
   });
 
+  it("clears stale designs and marks loading when createProject switches to a new project", async () => {
+    const refreshedProjectsRequest = deferredPromise<
+      { name: string; designCount: number }[]
+    >();
+    const ideasDesignsRequest = deferredPromise<
+      {
+        project: string;
+        name: string;
+        fileName: string;
+        updatedAtMs: number;
+      }[]
+    >();
+
+    vi.mocked(designApi.listProjects)
+      .mockResolvedValueOnce([{ name: "App", designCount: 1 }])
+      .mockImplementationOnce(() => refreshedProjectsRequest.promise);
+    vi.mocked(designApi.listDesigns).mockImplementation((project: string) => {
+      if (project === "Ideas") {
+        return ideasDesignsRequest.promise;
+      }
+
+      return Promise.resolve([
+        {
+          project: "App",
+          name: "Flow",
+          fileName: "Flow.excalidraw",
+          updatedAtMs: 1,
+        },
+      ]);
+    });
+    vi.mocked(designApi.createProject).mockResolvedValueOnce({
+      name: "Ideas",
+      designCount: 0,
+    });
+
+    const { result } = renderHook(() => useDesignLibrary());
+
+    await waitFor(() =>
+      expect(result.current.designs).toEqual([
+        {
+          project: "App",
+          name: "Flow",
+          fileName: "Flow.excalidraw",
+          updatedAtMs: 1,
+        },
+      ]),
+    );
+
+    let createProjectPromise!: Promise<unknown>;
+
+    act(() => {
+      createProjectPromise = result.current.createProject("Ideas");
+    });
+
+    await waitFor(() => expect(result.current.selectedProject).toBe("Ideas"));
+    expect(result.current.designs).toEqual([]);
+    expect(result.current.isDesignsLoading).toBe(true);
+
+    await act(async () => {
+      refreshedProjectsRequest.resolve([
+        { name: "App", designCount: 1 },
+        { name: "Ideas", designCount: 0 },
+      ]);
+      await createProjectPromise;
+    });
+
+    await act(async () => {
+      ideasDesignsRequest.resolve([
+        {
+          project: "Ideas",
+          name: "Sketch",
+          fileName: "Sketch.excalidraw",
+          updatedAtMs: 2,
+        },
+      ]);
+      await ideasDesignsRequest.promise;
+    });
+
+    await waitFor(() =>
+      expect(result.current.designs).toEqual([
+        {
+          project: "Ideas",
+          name: "Sketch",
+          fileName: "Sketch.excalidraw",
+          updatedAtMs: 2,
+        },
+      ]),
+    );
+  });
+
   it("clears stale designs immediately and ignores late results from the previous project", async () => {
     const appDesignsRequest = deferredPromise<
       {
@@ -277,6 +367,79 @@ describe("useDesignLibrary", () => {
 
     await waitFor(() =>
       expect(result.current.error).toBe("Project already exists."),
+    );
+  });
+
+  it("clears stale designs and marks loading when refresh reselects a different project", async () => {
+    const siteDesignsRequest = deferredPromise<
+      {
+        project: string;
+        name: string;
+        fileName: string;
+        updatedAtMs: number;
+      }[]
+    >();
+
+    vi.mocked(designApi.listProjects)
+      .mockResolvedValueOnce([{ name: "App", designCount: 1 }])
+      .mockResolvedValueOnce([{ name: "Site", designCount: 1 }]);
+    vi.mocked(designApi.listDesigns).mockImplementation((project: string) => {
+      if (project === "Site") {
+        return siteDesignsRequest.promise;
+      }
+
+      return Promise.resolve([
+        {
+          project: "App",
+          name: "Flow",
+          fileName: "Flow.excalidraw",
+          updatedAtMs: 1,
+        },
+      ]);
+    });
+
+    const { result } = renderHook(() => useDesignLibrary());
+
+    await waitFor(() =>
+      expect(result.current.designs).toEqual([
+        {
+          project: "App",
+          name: "Flow",
+          fileName: "Flow.excalidraw",
+          updatedAtMs: 1,
+        },
+      ]),
+    );
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(result.current.selectedProject).toBe("Site");
+    expect(result.current.designs).toEqual([]);
+    expect(result.current.isDesignsLoading).toBe(true);
+
+    await act(async () => {
+      siteDesignsRequest.resolve([
+        {
+          project: "Site",
+          name: "Landing",
+          fileName: "Landing.excalidraw",
+          updatedAtMs: 2,
+        },
+      ]);
+      await siteDesignsRequest.promise;
+    });
+
+    await waitFor(() =>
+      expect(result.current.designs).toEqual([
+        {
+          project: "Site",
+          name: "Landing",
+          fileName: "Landing.excalidraw",
+          updatedAtMs: 2,
+        },
+      ]),
     );
   });
 });

@@ -1,3 +1,4 @@
+import type { FormEvent } from "react";
 import { useId, useState } from "react";
 import { validateDisplayName } from "../lib/designNames";
 
@@ -40,31 +41,36 @@ export function RenameDialog({
     }
   }
 
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void submit();
+  }
+
   return (
     <div className="dialog-backdrop" role="presentation">
       <section className="dialog" role="dialog" aria-modal="true" aria-label={title}>
         <h2>{title}</h2>
-        <label htmlFor={inputId}>{inputLabel}</label>
-        <input
-          id={inputId}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          aria-describedby={error ? errorId : undefined}
-          autoFocus
-        />
-        {error ? (
-          <p className="form-error" id={errorId}>
-            {error}
-          </p>
-        ) : null}
-        <div className="dialog-actions">
-          <button type="button" onClick={onCancel}>
-            Cancel
-          </button>
-          <button type="button" onClick={submit}>
-            {submitLabel}
-          </button>
-        </div>
+        <form onSubmit={handleSubmit}>
+          <label htmlFor={inputId}>{inputLabel}</label>
+          <input
+            id={inputId}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            aria-describedby={error ? errorId : undefined}
+            autoFocus
+          />
+          {error ? (
+            <p className="form-error" id={errorId}>
+              {error}
+            </p>
+          ) : null}
+          <div className="dialog-actions">
+            <button type="button" onClick={onCancel}>
+              Cancel
+            </button>
+            <button type="submit">{submitLabel}</button>
+          </div>
+        </form>
       </section>
     </div>
   );

@@ -109,3 +109,39 @@
 ### Concerns
 
 - None.
+
+---
+
+## Task 4 Remaining Review Fixes
+
+### Status
+
+- Completed.
+
+### Commit
+
+- `HEAD` - `fix: centralize project transition loading`
+
+### Files Changed
+
+- `src/hooks/useDesignLibrary.ts`
+- `src/hooks/useDesignLibrary.test.tsx`
+- `src/components/RenameDialog.tsx`
+- `src/components/RenameDialog.test.tsx`
+- `.superpowers/sdd/task-4-report.md`
+
+### Tests And Commands
+
+- `PATH="/Users/rbangueses/.cargo/bin:/Users/rbangueses/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH" npm run test:run -- src/hooks src/components src/lib src/App.test.tsx`
+  - Failed first as expected:
+    - `RenameDialog` did not submit on Enter, so keyboard submission never reached validation or async error handling.
+    - `createProject()` left the previous project selected and its designs visible until project reload completed.
+    - `refresh()` reselection could leave stale designs visible until the follow-up design load effect ran.
+- `PATH="/Users/rbangueses/.cargo/bin:/Users/rbangueses/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH" npm run test:run -- src/hooks src/components src/lib src/App.test.tsx`
+  - Passed after the fixes: `8` test files, `20` tests passed.
+- `PATH="/Users/rbangueses/.cargo/bin:/Users/rbangueses/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH" npm run build`
+  - Passed: production build completed successfully.
+
+### Concerns
+
+- None.

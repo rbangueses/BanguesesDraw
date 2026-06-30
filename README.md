@@ -35,20 +35,7 @@ Each design is saved as a separate `.excalidraw` file. No cloud sync, account, o
 
 ### macOS
 
-Build the macOS app locally from a Mac:
-
-```bash
-npm ci
-npm exec tauri build
-```
-
-The DMG is created at:
-
-```text
-src-tauri/target/release/bundle/dmg/BanguesesDraw_0.1.0_aarch64.dmg
-```
-
-Open the `.dmg` and drag BanguesesDraw into Applications.
+Download the `BanguesesDraw-macos` artifact from GitHub Actions. Open the `.dmg` and drag BanguesesDraw into Applications.
 
 If macOS warns that the app is from an unidentified developer, right-click the app and choose **Open**. This can happen because the app is not code-signed yet.
 
@@ -94,21 +81,28 @@ Build a native app bundle:
 npm exec tauri build
 ```
 
-## Windows Builds With GitHub Actions
-
-This repo includes a Windows GitHub Actions workflow:
+Local macOS builds create a DMG under:
 
 ```text
+src-tauri/target/release/bundle/dmg/
+```
+
+## Installer Builds With GitHub Actions
+
+This repo includes GitHub Actions workflows for macOS and Windows installers:
+
+```text
+.github/workflows/macos-build.yml
 .github/workflows/windows-build.yml
 ```
 
-The workflow runs on pushes to `main` and can also be started manually from GitHub:
+The workflows run on pushes to `main` and can also be started manually from GitHub:
 
 1. Open the repo on GitHub.
 2. Go to **Actions**.
-3. Select **Windows Build**.
+3. Select **macOS Build** or **Windows Build**.
 4. Click **Run workflow**.
-5. Download the `BanguesesDraw-windows` artifact when the run finishes.
+5. Download `BanguesesDraw-macos` or `BanguesesDraw-windows` when the run finishes.
 
 ## Tech Stack
 

@@ -1,7 +1,7 @@
 import "@excalidraw/excalidraw/index.css";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import { ArrowLeft, Copy, Pencil, Save } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAutosave } from "../hooks/useAutosave";
 import { designApi } from "../lib/designApi";
 import { isExcalidrawScene } from "../lib/sceneValidation";
@@ -29,29 +29,35 @@ export function EditorView({
   onBack,
   onDesignMoved,
 }: EditorViewProps) {
-  const [scene, setScene] = useState<ExcalidrawScene | null>(null);
+  const [initialData, setInitialData] = useState<ExcalidrawScene | null>(null);
+  const [autosaveScene, setAutosaveScene] = useState<ExcalidrawScene | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
   const [isFileActionRunning, setIsFileActionRunning] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const latestSceneRef = useRef<ExcalidrawScene | null>(null);
   const sceneKey = `${project}/${fileName}`;
   const [loadedSceneKey, setLoadedSceneKey] = useState<string | null>(null);
   const autosave = useAutosave({
     project,
     fileName,
-    scene,
-    enabled: Boolean(scene) && loadedSceneKey === sceneKey,
+    scene: autosaveScene,
+    enabled: Boolean(autosaveScene) && loadedSceneKey === sceneKey,
   });
 
   useEffect(() => {
     let cancelled = false;
 
-    setScene(null);
+    setInitialData(null);
+    setAutosaveScene(null);
+    latestSceneRef.current = null;
     setLoadError(null);
     setLoadedSceneKey(null);
 
     if (initialScene) {
-      setScene(initialScene);
+      latestSceneRef.current = initialScene;
+      setInitialData(initialScene);
+      setAutosaveScene(initialScene);
       setLoadedSceneKey(sceneKey);
       return () => {
         cancelled = true;
@@ -67,7 +73,9 @@ export function EditorView({
         }
 
         if (!cancelled) {
-          setScene(design.content);
+          latestSceneRef.current = design.content;
+          setInitialData(design.content);
+          setAutosaveScene(design.content);
           setLoadedSceneKey(sceneKey);
         }
       } catch (unknownError) {
@@ -91,7 +99,7 @@ export function EditorView({
       return;
     }
 
-    if (!scene || autosave.status === "saved") {
+    if (!latestSceneRef.current || autosave.status === "saved") {
       onBack();
       return;
     }
@@ -107,15 +115,17 @@ export function EditorView({
     } finally {
       setIsLeaving(false);
     }
-  }, [autosave, isLeaving, onBack, scene]);
+  }, [autosave, isLeaving, onBack]);
 
   const getLatestSavedScene = useCallback(async () => {
-    if (!scene) {
+    const latestScene = latestSceneRef.current;
+
+    if (!latestScene) {
       throw new Error("Design is still loading.");
     }
 
     if (autosave.status === "saved") {
-      return scene;
+      return latestScene;
     }
 
     const didSave = await autosave.saveNow();
@@ -124,8 +134,30 @@ export function EditorView({
       throw new Error(autosave.error ?? "Save failed.");
     }
 
-    return scene;
-  }, [autosave, scene]);
+    return latestScene;
+  }, [autosave]);
+
+  const handleSceneChange = useCallback(
+    (
+      elements: readonly unknown[],
+      appState: Record<string, unknown>,
+      files: Record<string, unknown>,
+    ) => {
+      const currentScene = latestSceneRef.current;
+      const nextScene: ExcalidrawScene = {
+        type: "excalidraw",
+        version: currentScene?.version,
+        source: currentScene?.source,
+        elements: elements as unknown[],
+        appState,
+        files,
+      };
+
+      latestSceneRef.current = nextScene;
+      setAutosaveScene(nextScene);
+    },
+    [],
+  );
 
   const handleRename = useCallback(
     async (name: string) => {
@@ -185,7 +217,7 @@ export function EditorView({
             onClick={() => setPendingAction("rename")}
             aria-label="Rename design"
             title="Rename design"
-            disabled={isBusy || !scene}
+            disabled={isBusy || !initialData}
           >
             <Pencil size={16} />
           </button>
@@ -195,7 +227,7 @@ export function EditorView({
             onClick={() => setPendingAction("duplicate")}
             aria-label="Duplicate design"
             title="Duplicate design"
-            disabled={isBusy || !scene}
+            disabled={isBusy || !initialData}
           >
             <Copy size={16} />
           </button>
@@ -213,21 +245,12 @@ export function EditorView({
       </header>
       {loadError ? (
         <main className="empty-state">{loadError}</main>
-      ) : scene ? (
+      ) : initialData ? (
         <main className="canvas-wrap">
           <Excalidraw
             key={sceneKey}
-            initialData={scene as never}
-            onChange={(elements, appState, files) => {
-              setScene((currentScene) => ({
-                type: "excalidraw",
-                version: currentScene?.version,
-                source: currentScene?.source,
-                elements: elements as unknown[],
-                appState: appState as unknown as Record<string, unknown>,
-                files: files as Record<string, unknown>,
-              }));
-            }}
+            initialData={initialData as never}
+            onChange={handleSceneChange as never}
           />
           {autosave.error ? <div className="save-error">{autosave.error}</div> : null}
         </main>

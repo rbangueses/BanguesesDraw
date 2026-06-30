@@ -6,6 +6,7 @@ import { EditorView } from "./EditorView";
 
 let editCount = 0;
 let echoInitialDataOnRender = false;
+const initialDataRenders: unknown[] = [];
 
 vi.mock("@excalidraw/excalidraw", () => ({
   Excalidraw: ({
@@ -20,6 +21,8 @@ vi.mock("@excalidraw/excalidraw", () => ({
     ) => void;
   }) => (
     function MockExcalidraw() {
+      initialDataRenders.push(initialData);
+
       useEffect(() => {
         if (echoInitialDataOnRender) {
           onChange(initialData.elements ?? [], {}, {});
@@ -82,6 +85,7 @@ describe("EditorView", () => {
   beforeEach(() => {
     editCount = 0;
     echoInitialDataOnRender = false;
+    initialDataRenders.length = 0;
     vi.mocked(designApi.readDesign).mockReset();
     vi.mocked(designApi.renameDesign).mockReset();
     vi.mocked(designApi.duplicateDesign).mockReset();
@@ -155,6 +159,31 @@ describe("EditorView", () => {
 
     expect(await screen.findByText("Mock Excalidraw (0)")).toBeVisible();
     expect(designApi.writeDesign).not.toHaveBeenCalled();
+  });
+
+  it("does not feed live edits back into Excalidraw initialData", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(designApi.readDesign).mockResolvedValue({
+      project: "App",
+      name: "Flow",
+      fileName: "Flow.excalidraw",
+      content: { type: "excalidraw", elements: [], appState: {}, files: {} },
+    });
+
+    render(
+      <EditorView
+        project="App"
+        fileName="Flow.excalidraw"
+        onBack={vi.fn()}
+        onDesignMoved={vi.fn()}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Edit scene" }));
+
+    await waitFor(() => expect(initialDataRenders.length).toBeGreaterThan(1));
+    expect(new Set(initialDataRenders).size).toBe(1);
   });
 
   it("stays in the editor and surfaces save errors when leaving with pending edits", async () => {

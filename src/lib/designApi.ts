@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  DesignContent,
+  DesignKind,
   DesignScene,
   DesignSummary,
   ProjectSummary,
 } from "../types/designs";
-import type { ExcalidrawScene } from "../types/excalidraw";
 
 export const designApi = {
   listProjects: () => invoke<ProjectSummary[]>("list_projects"),
@@ -17,11 +18,14 @@ export const designApi = {
   deleteProject: (name: string) => invoke<void>("delete_project", { name }),
   listDesigns: (project: string) =>
     invoke<DesignSummary[]>("list_designs", { project }),
-  createDesign: (project: string, name: string) =>
-    invoke<DesignScene>("create_design", { project, name }),
+  createDesign: (
+    project: string,
+    name: string,
+    kind: DesignKind = "excalidraw",
+  ) => invoke<DesignScene>("create_design", { project, name, kind }),
   readDesign: (project: string, fileName: string) =>
     invoke<DesignScene>("read_design", { project, fileName }),
-  writeDesign: (project: string, fileName: string, content: ExcalidrawScene) =>
+  writeDesign: (project: string, fileName: string, content: DesignContent) =>
     invoke<DesignScene>("write_design", { project, fileName, content }),
   renameDesign: (project: string, oldFileName: string, newName: string) =>
     invoke<DesignSummary>("rename_design", { project, oldFileName, newName }),

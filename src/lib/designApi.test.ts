@@ -31,6 +31,7 @@ describe("designApi", () => {
       project: "App",
       name: "Sketch",
       fileName: "Sketch.excalidraw",
+      kind: "excalidraw",
       content: scene,
     });
     const { designApi } = await import("./designApi");
@@ -44,6 +45,25 @@ describe("designApi", () => {
     });
   });
 
+  it("passes design kind when creating a Mermaid design", async () => {
+    invoke.mockResolvedValueOnce({
+      project: "Docs",
+      name: "Flow",
+      fileName: "Flow.mmd",
+      kind: "mermaid",
+      content: { source: "flowchart LR\n" },
+    });
+    const { designApi } = await import("./designApi");
+
+    await designApi.createDesign("Docs", "Flow", "mermaid");
+
+    expect(invoke).toHaveBeenCalledWith("create_design", {
+      project: "Docs",
+      name: "Flow",
+      kind: "mermaid",
+    });
+  });
+
   it("calls import_design and export_design with selected paths", async () => {
     const { designApi } = await import("./designApi");
     invoke
@@ -51,6 +71,7 @@ describe("designApi", () => {
         project: "App",
         name: "Imported",
         fileName: "Imported.excalidraw",
+        kind: "excalidraw",
         updatedAtMs: 3,
       })
       .mockResolvedValueOnce(undefined);
@@ -61,6 +82,7 @@ describe("designApi", () => {
       project: "App",
       name: "Imported",
       fileName: "Imported.excalidraw",
+      kind: "excalidraw",
       updatedAtMs: 3,
     });
     await designApi.exportDesign(

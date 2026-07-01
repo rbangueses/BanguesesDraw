@@ -5,10 +5,19 @@ export type ProjectSummary = {
   designCount: number;
 };
 
+export type DesignKind = "excalidraw" | "mermaid";
+
+export type MermaidDesignContent = {
+  source: string;
+};
+
+export type DesignContent = ExcalidrawScene | MermaidDesignContent;
+
 export type DesignSummary = {
   project: string;
   name: string;
   fileName: string;
+  kind: DesignKind;
   updatedAtMs: number;
 };
 
@@ -16,5 +25,6 @@ export type DesignScene = {
   project: string;
   name: string;
   fileName: string;
-  content: ExcalidrawScene;
+  kind: DesignKind;
+  content: DesignContent;
 };

@@ -1,6 +1,6 @@
 pub mod designs;
 
-use designs::{DesignScene, DesignSummary, ProjectSummary};
+use designs::{DesignKind, DesignScene, DesignSummary, ProjectSummary};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
@@ -63,8 +63,14 @@ fn create_design(
     app: tauri::AppHandle,
     project: String,
     name: String,
+    kind: Option<DesignKind>,
 ) -> Result<DesignScene, String> {
-    designs::create_design(&designs_root(&app)?, &project, &name)
+    designs::create_design(
+        &designs_root(&app)?,
+        &project,
+        &name,
+        kind.unwrap_or(DesignKind::Excalidraw),
+    )
         .map_err(|error| error.to_string())
 }
 

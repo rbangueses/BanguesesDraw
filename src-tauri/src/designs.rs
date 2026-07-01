@@ -14,10 +14,18 @@ pub struct ProjectSummary {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub enum DesignKind {
+    Excalidraw,
+    Mermaid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DesignSummary {
     pub project: String,
     pub name: String,
     pub file_name: String,
+    pub kind: DesignKind,
     pub updated_at_ms: u128,
 }
 
@@ -27,6 +35,7 @@ pub struct DesignScene {
     pub project: String,
     pub name: String,
     pub file_name: String,
+    pub kind: DesignKind,
     pub content: Value,
 }
 
@@ -57,7 +66,27 @@ pub fn empty_scene() -> Value {
     })
 }
 
-const EXTENSION: &str = "excalidraw";
+const EXCALIDRAW_EXTENSION: &str = "excalidraw";
+const MERMAID_EXTENSION: &str = "mmd";
+
+fn empty_mermaid_source() -> Value {
+    json!({ "source": "flowchart LR\n" })
+}
+
+fn extension_for_kind(kind: &DesignKind) -> &'static str {
+    match kind {
+        DesignKind::Excalidraw => EXCALIDRAW_EXTENSION,
+        DesignKind::Mermaid => MERMAID_EXTENSION,
+    }
+}
+
+fn kind_from_path(path: &Path) -> Option<DesignKind> {
+    match path.extension().and_then(|extension| extension.to_str()) {
+        Some(EXCALIDRAW_EXTENSION) => Some(DesignKind::Excalidraw),
+        Some(MERMAID_EXTENSION) => Some(DesignKind::Mermaid),
+        _ => None,
+    }
+}
 
 fn ensure_root(root: &Path) -> Result<(), DesignError> {
     fs::create_dir_all(root)?;
@@ -79,9 +108,9 @@ fn validate_name(name: &str) -> Result<String, DesignError> {
     Ok(trimmed.to_string())
 }
 
-fn design_file_name(name: &str) -> Result<String, DesignError> {
+fn design_file_name_for_kind(name: &str, kind: &DesignKind) -> Result<String, DesignError> {
     let clean = validate_name(name)?;
-    let suffix = format!(".{EXTENSION}");
+    let suffix = format!(".{}", extension_for_kind(kind));
     if clean.ends_with(&suffix) {
         Ok(clean)
     } else {
@@ -89,11 +118,23 @@ fn design_file_name(name: &str) -> Result<String, DesignError> {
     }
 }
 
+fn design_file_name(name: &str) -> Result<String, DesignError> {
+    let clean = validate_name(name)?;
+    if kind_from_path(Path::new(&clean)).is_some() {
+        Ok(clean)
+    } else {
+        design_file_name_for_kind(&clean, &DesignKind::Excalidraw)
+    }
+}
+
 fn design_name_from_file(file_name: &str) -> String {
-    file_name
-        .strip_suffix(&format!(".{EXTENSION}"))
-        .unwrap_or(file_name)
-        .to_string()
+    match kind_from_path(Path::new(file_name)) {
+        Some(kind) => file_name
+            .strip_suffix(&format!(".{}", extension_for_kind(&kind)))
+            .unwrap_or(file_name)
+            .to_string(),
+        None => file_name.to_string(),
+    }
 }
 
 fn design_name_from_path(path: &Path) -> Result<String, DesignError> {
@@ -115,10 +156,22 @@ fn design_path(root: &Path, project: &str, file_name: &str) -> Result<PathBuf, D
     Ok(project_dir.join(file_name))
 }
 
+fn design_path_for_kind(
+    root: &Path,
+    project: &str,
+    name: &str,
+    kind: &DesignKind,
+) -> Result<PathBuf, DesignError> {
+    let project_dir = project_path(root, project)?;
+    let file_name = design_file_name_for_kind(name, kind)?;
+    Ok(project_dir.join(file_name))
+}
+
 fn unique_design_path(
     root: &Path,
     project: &str,
     preferred_name: &str,
+    kind: &DesignKind,
 ) -> Result<PathBuf, DesignError> {
     let project_dir = project_path(root, project)?;
     if !project_dir.exists() {
@@ -126,7 +179,7 @@ fn unique_design_path(
     }
 
     let preferred_name = validate_name(preferred_name)?;
-    let first = project_dir.join(design_file_name(&preferred_name)?);
+    let first = project_dir.join(design_file_name_for_kind(&preferred_name, kind)?);
     if !first.exists() {
         return Ok(first);
     }
@@ -135,9 +188,9 @@ fn unique_design_path(
         let candidate_name = if index == 1 {
             format!("{preferred_name} Copy")
         } else {
-            format!("{preferred_name} Copy {index}")
-        };
-        let candidate = project_dir.join(design_file_name(&candidate_name)?);
+                format!("{preferred_name} Copy {index}")
+            };
+        let candidate = project_dir.join(design_file_name_for_kind(&candidate_name, kind)?);
         if !candidate.exists() {
             return Ok(candidate);
         }
@@ -155,8 +208,8 @@ fn modified_ms(path: &Path) -> u128 {
         .unwrap_or(0)
 }
 
-fn is_scene_file(path: &Path) -> bool {
-    path.extension().and_then(|extension| extension.to_str()) == Some(EXTENSION)
+fn is_design_file(path: &Path) -> bool {
+    kind_from_path(path).is_some()
 }
 
 fn project_summary(path: &Path) -> Result<ProjectSummary, DesignError> {
@@ -167,7 +220,7 @@ fn project_summary(path: &Path) -> Result<ProjectSummary, DesignError> {
         .to_string();
     let design_count = fs::read_dir(path)?
         .filter_map(Result::ok)
-        .filter(|entry| is_scene_file(&entry.path()))
+        .filter(|entry| is_design_file(&entry.path()))
         .count();
 
     Ok(ProjectSummary { name, design_count })
@@ -205,6 +258,25 @@ fn validate_scene(value: &Value) -> Result<(), DesignError> {
     }
 
     Ok(())
+}
+
+fn validate_mermaid(value: &Value) -> Result<(), DesignError> {
+    match value.get("source").and_then(Value::as_str) {
+        Some(source) if source.trim_start().starts_with("flowchart ") => Ok(()),
+        Some(_) => Err(DesignError::InvalidDesignFile(
+            "mermaid source must start with a flowchart declaration".to_string(),
+        )),
+        None => Err(DesignError::InvalidDesignFile(
+            "missing mermaid source".to_string(),
+        )),
+    }
+}
+
+fn validate_content(kind: &DesignKind, value: &Value) -> Result<(), DesignError> {
+    match kind {
+        DesignKind::Excalidraw => validate_scene(value),
+        DesignKind::Mermaid => validate_mermaid(value),
+    }
 }
 
 pub fn list_projects(root: &Path) -> Result<Vec<ProjectSummary>, DesignError> {
@@ -274,7 +346,7 @@ pub fn duplicate_project(
     fs::create_dir(&target)?;
     for entry in fs::read_dir(source)? {
         let entry = entry?;
-        if entry.file_type()?.is_file() && is_scene_file(&entry.path()) {
+        if entry.file_type()?.is_file() && is_design_file(&entry.path()) {
             fs::copy(entry.path(), target.join(entry.file_name()))?;
         }
     }
@@ -291,13 +363,17 @@ pub fn list_designs(root: &Path, project: &str) -> Result<Vec<DesignSummary>, De
     let mut designs = fs::read_dir(&project_dir)?
         .filter_map(Result::ok)
         .filter(|entry| entry.path().is_file())
-        .filter(|entry| is_scene_file(&entry.path()))
+        .filter(|entry| is_design_file(&entry.path()))
         .map(|entry| {
             let file_name = entry.file_name().to_string_lossy().to_string();
+            let kind = kind_from_path(&entry.path()).ok_or_else(|| {
+                DesignError::InvalidDesignFile(entry.path().display().to_string())
+            })?;
             Ok(DesignSummary {
                 project: project.to_string(),
                 name: design_name_from_file(&file_name),
                 file_name,
+                kind,
                 updated_at_ms: modified_ms(&entry.path()),
             })
         })
@@ -306,13 +382,21 @@ pub fn list_designs(root: &Path, project: &str) -> Result<Vec<DesignSummary>, De
     Ok(designs)
 }
 
-pub fn create_design(root: &Path, project: &str, name: &str) -> Result<DesignScene, DesignError> {
-    let path = design_path(root, project, name)?;
+pub fn create_design(
+    root: &Path,
+    project: &str,
+    name: &str,
+    kind: DesignKind,
+) -> Result<DesignScene, DesignError> {
+    let path = design_path_for_kind(root, project, name, &kind)?;
     if path.exists() {
         return Err(DesignError::AlreadyExists(name.to_string()));
     }
 
-    let content = empty_scene();
+    let content = match kind {
+        DesignKind::Excalidraw => empty_scene(),
+        DesignKind::Mermaid => empty_mermaid_source(),
+    };
     write_design(
         root,
         project,
@@ -327,13 +411,26 @@ pub fn read_design(root: &Path, project: &str, file_name: &str) -> Result<Design
         return Err(DesignError::NotFound(file_name.to_string()));
     }
 
-    let content: Value = serde_json::from_str(&fs::read_to_string(&path)?)?;
-    validate_scene(&content)?;
+    let kind = kind_from_path(&path)
+        .ok_or_else(|| DesignError::InvalidDesignFile(file_name.to_string()))?;
+    let content = match kind {
+        DesignKind::Excalidraw => {
+            let content: Value = serde_json::from_str(&fs::read_to_string(&path)?)?;
+            validate_scene(&content)?;
+            content
+        }
+        DesignKind::Mermaid => {
+            let content = json!({ "source": fs::read_to_string(&path)? });
+            validate_mermaid(&content)?;
+            content
+        }
+    };
     let file_name = path.file_name().unwrap().to_string_lossy().to_string();
     Ok(DesignScene {
         project: project.to_string(),
         name: design_name_from_file(&file_name),
         file_name,
+        kind,
         content,
     })
 }
@@ -344,8 +441,10 @@ pub fn write_design(
     file_name: &str,
     content: &Value,
 ) -> Result<DesignScene, DesignError> {
-    validate_scene(content)?;
     let path = design_path(root, project, file_name)?;
+    let kind = kind_from_path(&path)
+        .ok_or_else(|| DesignError::InvalidDesignFile(file_name.to_string()))?;
+    validate_content(&kind, content)?;
     let parent = path
         .parent()
         .ok_or_else(|| DesignError::InvalidName(file_name.to_string()))?;
@@ -353,8 +452,17 @@ pub fn write_design(
         return Err(DesignError::NotFound(project.to_string()));
     }
 
-    let tmp_path = path.with_extension(format!("{EXTENSION}.tmp"));
-    fs::write(&tmp_path, serde_json::to_string_pretty(content)?)?;
+    let tmp_path = path.with_extension(format!("{}.tmp", extension_for_kind(&kind)));
+    match kind {
+        DesignKind::Excalidraw => fs::write(&tmp_path, serde_json::to_string_pretty(content)?)?,
+        DesignKind::Mermaid => {
+            let source = content
+                .get("source")
+                .and_then(Value::as_str)
+                .ok_or_else(|| DesignError::InvalidDesignFile("missing mermaid source".to_string()))?;
+            fs::write(&tmp_path, source)?;
+        }
+    }
     fs::rename(&tmp_path, &path)?;
     read_design(root, project, path.file_name().unwrap().to_string_lossy().as_ref())
 }
@@ -366,7 +474,9 @@ pub fn rename_design(
     new_name: &str,
 ) -> Result<DesignSummary, DesignError> {
     let old_path = design_path(root, project, old_file_name)?;
-    let new_path = design_path(root, project, new_name)?;
+    let kind = kind_from_path(&old_path)
+        .ok_or_else(|| DesignError::InvalidDesignFile(old_file_name.to_string()))?;
+    let new_path = design_path_for_kind(root, project, new_name, &kind)?;
     if !old_path.exists() {
         return Err(DesignError::NotFound(old_file_name.to_string()));
     }
@@ -380,6 +490,7 @@ pub fn rename_design(
         project: project.to_string(),
         name: design_name_from_file(&file_name),
         file_name,
+        kind,
         updated_at_ms: modified_ms(&new_path),
     })
 }
@@ -391,7 +502,9 @@ pub fn duplicate_design(
     target_name: &str,
 ) -> Result<DesignSummary, DesignError> {
     let source = design_path(root, project, source_file_name)?;
-    let target = design_path(root, project, target_name)?;
+    let kind = kind_from_path(&source)
+        .ok_or_else(|| DesignError::InvalidDesignFile(source_file_name.to_string()))?;
+    let target = design_path_for_kind(root, project, target_name, &kind)?;
     if !source.exists() {
         return Err(DesignError::NotFound(source_file_name.to_string()));
     }
@@ -405,6 +518,7 @@ pub fn duplicate_design(
         project: project.to_string(),
         name: design_name_from_file(&file_name),
         file_name,
+        kind,
         updated_at_ms: modified_ms(&target),
     })
 }
@@ -418,18 +532,40 @@ pub fn import_design(
         return Err(DesignError::NotFound(source_path.display().to_string()));
     }
 
-    let content: Value = serde_json::from_str(&fs::read_to_string(source_path)?)?;
-    validate_scene(&content)?;
+    let kind = kind_from_path(source_path)
+        .ok_or_else(|| DesignError::InvalidDesignFile(source_path.display().to_string()))?;
+    let content = match kind {
+        DesignKind::Excalidraw => {
+            let content: Value = serde_json::from_str(&fs::read_to_string(source_path)?)?;
+            validate_scene(&content)?;
+            content
+        }
+        DesignKind::Mermaid => {
+            let content = json!({ "source": fs::read_to_string(source_path)? });
+            validate_mermaid(&content)?;
+            content
+        }
+    };
 
     let preferred_name = design_name_from_path(source_path)?;
-    let target = unique_design_path(root, project, &preferred_name)?;
-    fs::write(&target, serde_json::to_string_pretty(&content)?)?;
+    let target = unique_design_path(root, project, &preferred_name, &kind)?;
+    match kind {
+        DesignKind::Excalidraw => fs::write(&target, serde_json::to_string_pretty(&content)?)?,
+        DesignKind::Mermaid => {
+            let source = content
+                .get("source")
+                .and_then(Value::as_str)
+                .ok_or_else(|| DesignError::InvalidDesignFile("missing mermaid source".to_string()))?;
+            fs::write(&target, source)?;
+        }
+    }
 
     let file_name = target.file_name().unwrap().to_string_lossy().to_string();
     Ok(DesignSummary {
         project: project.to_string(),
         name: design_name_from_file(&file_name),
         file_name,
+        kind,
         updated_at_ms: modified_ms(&target),
     })
 }
@@ -445,8 +581,20 @@ pub fn export_design(
         return Err(DesignError::NotFound(file_name.to_string()));
     }
 
-    let content: Value = serde_json::from_str(&fs::read_to_string(&source)?)?;
-    validate_scene(&content)?;
+    let kind = kind_from_path(&source)
+        .ok_or_else(|| DesignError::InvalidDesignFile(file_name.to_string()))?;
+    let content = match kind {
+        DesignKind::Excalidraw => {
+            let content: Value = serde_json::from_str(&fs::read_to_string(&source)?)?;
+            validate_scene(&content)?;
+            content
+        }
+        DesignKind::Mermaid => {
+            let content = json!({ "source": fs::read_to_string(&source)? });
+            validate_mermaid(&content)?;
+            content
+        }
+    };
 
     if let Some(parent) = target_path.parent() {
         if !parent.exists() {
@@ -454,7 +602,16 @@ pub fn export_design(
         }
     }
 
-    fs::write(target_path, serde_json::to_string_pretty(&content)?)?;
+    match kind {
+        DesignKind::Excalidraw => fs::write(target_path, serde_json::to_string_pretty(&content)?)?,
+        DesignKind::Mermaid => {
+            let source = content
+                .get("source")
+                .and_then(Value::as_str)
+                .ok_or_else(|| DesignError::InvalidDesignFile("missing mermaid source".to_string()))?;
+            fs::write(target_path, source)?;
+        }
+    }
     Ok(())
 }
 
@@ -513,7 +670,7 @@ mod tests {
     fn renames_duplicates_and_deletes_projects() {
         let root = test_root("project-lifecycle");
         create_project(&root, "Original").unwrap();
-        create_design(&root, "Original", "Home").unwrap();
+        create_design(&root, "Original", "Home", DesignKind::Excalidraw).unwrap();
 
         let duplicated = duplicate_project(&root, "Original", "Original Copy").unwrap();
         assert_eq!(duplicated.name, "Original Copy");
@@ -538,8 +695,9 @@ mod tests {
     fn creates_reads_writes_and_lists_designs() {
         let root = test_root("designs");
         create_project(&root, "App").unwrap();
-        let created = create_design(&root, "App", "First Flow").unwrap();
+        let created = create_design(&root, "App", "First Flow", DesignKind::Excalidraw).unwrap();
         assert_eq!(created.file_name, "First Flow.excalidraw");
+        assert_eq!(created.kind, DesignKind::Excalidraw);
         assert_eq!(created.content["type"], "excalidraw");
 
         let updated = json!({
@@ -558,6 +716,73 @@ mod tests {
         let designs = list_designs(&root, "App").unwrap();
         assert_eq!(designs.len(), 1);
         assert_eq!(designs[0].name, "First Flow");
+        assert_eq!(designs[0].kind, DesignKind::Excalidraw);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn lists_excalidraw_and_mermaid_designs() {
+        let root = test_root("mixed-designs");
+        create_project(&root, "Architecture").unwrap();
+        create_design(&root, "Architecture", "Canvas", DesignKind::Excalidraw).unwrap();
+        create_design(&root, "Architecture", "Flow", DesignKind::Mermaid).unwrap();
+
+        let designs = list_designs(&root, "Architecture").unwrap();
+        let kinds = designs
+            .iter()
+            .map(|design| (design.file_name.as_str(), design.kind.clone()))
+            .collect::<Vec<_>>();
+
+        assert!(kinds.contains(&("Canvas.excalidraw", DesignKind::Excalidraw)));
+        assert!(kinds.contains(&("Flow.mmd", DesignKind::Mermaid)));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reads_and_writes_mermaid_source() {
+        let root = test_root("mermaid-read-write");
+        create_project(&root, "Architecture").unwrap();
+        let design = create_design(&root, "Architecture", "Routing", DesignKind::Mermaid).unwrap();
+
+        assert_eq!(design.kind, DesignKind::Mermaid);
+        assert_eq!(design.content, json!({ "source": "flowchart LR\n" }));
+
+        let updated = write_design(
+            &root,
+            "Architecture",
+            "Routing.mmd",
+            &json!({ "source": "flowchart LR\n  A[Start] --> B[Done]\n" }),
+        )
+        .unwrap();
+
+        assert_eq!(updated.kind, DesignKind::Mermaid);
+        assert_eq!(
+            updated.content,
+            json!({ "source": "flowchart LR\n  A[Start] --> B[Done]\n" })
+        );
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn imports_and_exports_mermaid_source() {
+        let root = test_root("mermaid-import-export");
+        create_project(&root, "Architecture").unwrap();
+        let external = root.join("external.mmd");
+        let exported = root.join("exported.mmd");
+        fs::write(&external, "flowchart TD\n  A[Start] --> B[Done]\n").unwrap();
+
+        let imported = import_design(&root, "Architecture", &external).unwrap();
+        assert_eq!(imported.kind, DesignKind::Mermaid);
+        assert_eq!(imported.file_name, "external.mmd");
+
+        export_design(&root, "Architecture", "external.mmd", &exported).unwrap();
+        assert_eq!(
+            fs::read_to_string(&exported).unwrap(),
+            "flowchart TD\n  A[Start] --> B[Done]\n"
+        );
 
         fs::remove_dir_all(root).unwrap();
     }
@@ -566,8 +791,8 @@ mod tests {
     fn rejects_design_name_conflicts() {
         let root = test_root("design-conflicts");
         create_project(&root, "Ideas").unwrap();
-        create_design(&root, "Ideas", "Sketch").unwrap();
-        create_design(&root, "Ideas", "Other").unwrap();
+        create_design(&root, "Ideas", "Sketch", DesignKind::Excalidraw).unwrap();
+        create_design(&root, "Ideas", "Other", DesignKind::Excalidraw).unwrap();
 
         let rename_err = rename_design(&root, "Ideas", "Sketch.excalidraw", "Other").unwrap_err();
         assert!(matches!(rename_err, DesignError::AlreadyExists(_)));
@@ -617,7 +842,7 @@ mod tests {
     fn write_design_replaces_content_and_removes_temp_file() {
         let root = test_root("write-replace");
         create_project(&root, "App").unwrap();
-        create_design(&root, "App", "Flow").unwrap();
+        create_design(&root, "App", "Flow", DesignKind::Excalidraw).unwrap();
 
         let first = json!({
             "type": "excalidraw",
@@ -652,7 +877,7 @@ mod tests {
     fn duplicate_project_ignores_non_scene_files() {
         let root = test_root("duplicate-project-filter");
         create_project(&root, "Source").unwrap();
-        create_design(&root, "Source", "Scene").unwrap();
+        create_design(&root, "Source", "Scene", DesignKind::Excalidraw).unwrap();
         fs::write(root.join("Source").join("notes.txt"), "ignore me").unwrap();
         fs::write(root.join("Source").join("Scene.excalidraw.tmp"), "temp").unwrap();
 
@@ -669,7 +894,7 @@ mod tests {
     fn rename_duplicate_and_delete_designs_preserve_originals() {
         let root = test_root("rename-duplicate");
         create_project(&root, "Ideas").unwrap();
-        create_design(&root, "Ideas", "Sketch").unwrap();
+        create_design(&root, "Ideas", "Sketch", DesignKind::Excalidraw).unwrap();
 
         let renamed = rename_design(&root, "Ideas", "Sketch.excalidraw", "Sketch v2").unwrap();
         assert_eq!(renamed.file_name, "Sketch v2.excalidraw");
@@ -715,7 +940,7 @@ mod tests {
         let external_root = test_root("external-import");
         fs::create_dir_all(&external_root).unwrap();
         create_project(&root, "App").unwrap();
-        create_design(&root, "App", "Flow").unwrap();
+        create_design(&root, "App", "Flow", DesignKind::Excalidraw).unwrap();
 
         let source = external_root.join("Flow.excalidraw");
         let scene = json!({

@@ -130,6 +130,13 @@ Requirements:
 - Rust stable
 - Tauri system dependencies for your OS
 
+Clone the repository:
+
+```bash
+git clone https://github.com/rbangueses/BanguesesDraw.git
+cd BanguesesDraw
+```
+
 Install dependencies:
 
 ```bash
@@ -142,23 +149,31 @@ Run the app in development:
 npm run tauri:dev
 ```
 
-Run tests:
-
-```bash
-npm run test:run
-cargo test --manifest-path src-tauri/Cargo.toml
-```
-
 Build a native app bundle:
 
 ```bash
 npm exec tauri build
 ```
 
-Local macOS builds create a DMG under:
+On macOS, the local build creates a DMG under:
 
 ```text
 src-tauri/target/release/bundle/dmg/
+```
+
+Open that folder:
+
+```bash
+open src-tauri/target/release/bundle/dmg
+```
+
+Then open the `.dmg`, drag BanguesesDraw into Applications, and launch it from Applications. A local build usually avoids the downloaded-artifact Gatekeeper flow, but if macOS still warns, right-click the app and choose **Open**.
+
+Run tests:
+
+```bash
+npm run test:run
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
 ## Installer Builds With GitHub Actions

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  BackupResult,
   DesignContent,
   DesignKind,
   DesignScene,
@@ -16,6 +17,11 @@ export const designApi = {
   duplicateProject: (sourceName: string, targetName: string) =>
     invoke<ProjectSummary>("duplicate_project", { sourceName, targetName }),
   deleteProject: (name: string) => invoke<void>("delete_project", { name }),
+  setProjectVisibility: (name: string, visibleInPresentationMode: boolean) =>
+    invoke<ProjectSummary>("set_project_visibility", {
+      name,
+      visibleInPresentationMode,
+    }),
   listDesigns: (project: string) =>
     invoke<DesignSummary[]>("list_designs", { project }),
   createDesign: (
@@ -45,4 +51,6 @@ export const designApi = {
     invoke<DesignSummary>("import_design", { project, sourcePath }),
   exportDesign: (project: string, fileName: string, targetPath: string) =>
     invoke<void>("export_design", { project, fileName, targetPath }),
+  backupLibrary: (targetPath: string) =>
+    invoke<BackupResult>("backup_library", { targetPath }),
 };

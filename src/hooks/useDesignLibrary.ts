@@ -24,6 +24,10 @@ type UseDesignLibraryResult = {
   renameProject: (oldName: string, newName: string) => Promise<ProjectSummary>;
   duplicateProject: (sourceName: string, targetName: string) => Promise<ProjectSummary>;
   deleteProject: (name: string) => Promise<void>;
+  setProjectVisibility: (
+    name: string,
+    visibleInPresentationMode: boolean,
+  ) => Promise<ProjectSummary>;
   createDesign: (
     name: string,
     kind?: DesignKind,
@@ -43,7 +47,7 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function useDesignLibrary(): UseDesignLibraryResult {
+export function useDesignLibrary(initialSelectedProject?: string | null): UseDesignLibraryResult {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [designs, setDesigns] = useState<DesignSummary[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
@@ -51,16 +55,21 @@ export function useDesignLibrary(): UseDesignLibraryResult {
   const [isLoading, setIsLoading] = useState(true);
   const [isDesignsLoading, setIsDesignsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const selectedProjectRef = useRef<string | null>(null);
+  const selectedProjectRef = useRef<string | null>(initialSelectedProject ?? null);
+  const selectedProjectStateRef = useRef<string | null>(null);
   const designLoadRequestRef = useRef(0);
 
   const transitionSelectedProject = useCallback((project: string | null) => {
-    if (selectedProjectRef.current === project) {
+    if (
+      selectedProjectRef.current === project &&
+      selectedProjectStateRef.current === project
+    ) {
       return false;
     }
 
     designLoadRequestRef.current += 1;
     selectedProjectRef.current = project;
+    selectedProjectStateRef.current = project;
     setSelectedProject(project);
     setDesigns([]);
     setIsDesignsLoading(Boolean(project));
@@ -237,6 +246,15 @@ export function useDesignLibrary(): UseDesignLibraryResult {
         }
 
         await loadProjects(preferredProject);
+      }),
+    setProjectVisibility: (name, visibleInPresentationMode) =>
+      runProjectAction(async () => {
+        const project = await designApi.setProjectVisibility(
+          name,
+          visibleInPresentationMode,
+        );
+        await loadProjects(selectedProjectRef.current);
+        return project;
       }),
     createDesign: async (name, kind = "excalidraw", content) =>
       withProject(async (project) => {

@@ -10,6 +10,21 @@ use thiserror::Error;
 pub struct ProjectSummary {
     pub name: String,
     pub design_count: usize,
+    pub visible_in_presentation_mode: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupResult {
+    pub project_count: usize,
+    pub file_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct ProjectMetadata {
+    #[serde(default)]
+    visible_in_presentation_mode: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -49,6 +64,8 @@ pub enum DesignError {
     AlreadyExists(String),
     #[error("invalid design file: {0}")]
     InvalidDesignFile(String),
+    #[error("invalid backup target: {0}")]
+    InvalidBackupTarget(String),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
     #[error("json error: {0}")]
@@ -68,6 +85,7 @@ pub fn empty_scene() -> Value {
 
 const EXCALIDRAW_EXTENSION: &str = "excalidraw";
 const MERMAID_EXTENSION: &str = "mmd";
+const PROJECT_METADATA_FILE: &str = ".banguesesdraw-project.json";
 
 fn empty_mermaid_source() -> Value {
     json!({ "source": "flowchart LR\n" })
@@ -150,6 +168,30 @@ fn project_path(root: &Path, project: &str) -> Result<PathBuf, DesignError> {
     Ok(root.join(validate_name(project)?))
 }
 
+fn project_metadata_path(project_path: &Path) -> PathBuf {
+    project_path.join(PROJECT_METADATA_FILE)
+}
+
+fn read_project_metadata(project_path: &Path) -> Result<ProjectMetadata, DesignError> {
+    let path = project_metadata_path(project_path);
+    if !path.exists() {
+        return Ok(ProjectMetadata::default());
+    }
+
+    Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
+}
+
+fn write_project_metadata(
+    project_path: &Path,
+    metadata: &ProjectMetadata,
+) -> Result<(), DesignError> {
+    fs::write(
+        project_metadata_path(project_path),
+        serde_json::to_string_pretty(metadata)?,
+    )?;
+    Ok(())
+}
+
 fn design_path(root: &Path, project: &str, file_name: &str) -> Result<PathBuf, DesignError> {
     let project_dir = project_path(root, project)?;
     let file_name = design_file_name(file_name)?;
@@ -188,8 +230,8 @@ fn unique_design_path(
         let candidate_name = if index == 1 {
             format!("{preferred_name} Copy")
         } else {
-                format!("{preferred_name} Copy {index}")
-            };
+            format!("{preferred_name} Copy {index}")
+        };
         let candidate = project_dir.join(design_file_name_for_kind(&candidate_name, kind)?);
         if !candidate.exists() {
             return Ok(candidate);
@@ -222,8 +264,13 @@ fn project_summary(path: &Path) -> Result<ProjectSummary, DesignError> {
         .filter_map(Result::ok)
         .filter(|entry| is_design_file(&entry.path()))
         .count();
+    let metadata = read_project_metadata(path)?;
 
-    Ok(ProjectSummary { name, design_count })
+    Ok(ProjectSummary {
+        name,
+        design_count,
+        visible_in_presentation_mode: metadata.visible_in_presentation_mode,
+    })
 }
 
 fn validate_scene(value: &Value) -> Result<(), DesignError> {
@@ -298,6 +345,7 @@ pub fn create_project(root: &Path, name: &str) -> Result<ProjectSummary, DesignE
     }
 
     fs::create_dir(&path)?;
+    write_project_metadata(&path, &ProjectMetadata::default())?;
     project_summary(&path)
 }
 
@@ -329,6 +377,72 @@ pub fn delete_project(root: &Path, name: &str) -> Result<(), DesignError> {
     Ok(())
 }
 
+pub fn set_project_visibility(
+    root: &Path,
+    name: &str,
+    visible_in_presentation_mode: bool,
+) -> Result<ProjectSummary, DesignError> {
+    let path = project_path(root, name)?;
+    if !path.exists() {
+        return Err(DesignError::NotFound(name.to_string()));
+    }
+
+    write_project_metadata(
+        &path,
+        &ProjectMetadata {
+            visible_in_presentation_mode,
+        },
+    )?;
+    project_summary(&path)
+}
+
+pub fn backup_library(root: &Path, target: &Path) -> Result<BackupResult, DesignError> {
+    ensure_root(root)?;
+
+    if target.starts_with(root) {
+        return Err(DesignError::InvalidBackupTarget(
+            "Choose a backup folder outside the live design library.".to_string(),
+        ));
+    }
+
+    fs::create_dir_all(target)?;
+
+    let mut project_count = 0;
+    let mut file_count = 0;
+
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+
+        let source_project = entry.path();
+        let target_project = target.join(entry.file_name());
+        fs::create_dir_all(&target_project)?;
+        project_count += 1;
+
+        for project_entry in fs::read_dir(source_project)? {
+            let project_entry = project_entry?;
+            if !project_entry.file_type()?.is_file() {
+                continue;
+            }
+
+            let source_path = project_entry.path();
+            let file_name = project_entry.file_name();
+            let is_metadata = file_name.to_string_lossy() == PROJECT_METADATA_FILE;
+            if is_metadata || is_design_file(&source_path) {
+                fs::copy(&source_path, target_project.join(file_name))?;
+                file_count += 1;
+            }
+        }
+    }
+
+    Ok(BackupResult {
+        project_count,
+        file_count,
+    })
+}
+
 pub fn duplicate_project(
     root: &Path,
     source_name: &str,
@@ -344,6 +458,8 @@ pub fn duplicate_project(
     }
 
     fs::create_dir(&target)?;
+    let metadata = read_project_metadata(&source)?;
+    write_project_metadata(&target, &metadata)?;
     for entry in fs::read_dir(source)? {
         let entry = entry?;
         if entry.file_type()?.is_file() && is_design_file(&entry.path()) {
@@ -405,7 +521,11 @@ pub fn create_design(
     )
 }
 
-pub fn read_design(root: &Path, project: &str, file_name: &str) -> Result<DesignScene, DesignError> {
+pub fn read_design(
+    root: &Path,
+    project: &str,
+    file_name: &str,
+) -> Result<DesignScene, DesignError> {
     let path = design_path(root, project, file_name)?;
     if !path.exists() {
         return Err(DesignError::NotFound(file_name.to_string()));
@@ -459,12 +579,18 @@ pub fn write_design(
             let source = content
                 .get("source")
                 .and_then(Value::as_str)
-                .ok_or_else(|| DesignError::InvalidDesignFile("missing mermaid source".to_string()))?;
+                .ok_or_else(|| {
+                    DesignError::InvalidDesignFile("missing mermaid source".to_string())
+                })?;
             fs::write(&tmp_path, source)?;
         }
     }
     fs::rename(&tmp_path, &path)?;
-    read_design(root, project, path.file_name().unwrap().to_string_lossy().as_ref())
+    read_design(
+        root,
+        project,
+        path.file_name().unwrap().to_string_lossy().as_ref(),
+    )
 }
 
 pub fn rename_design(
@@ -555,7 +681,9 @@ pub fn import_design(
             let source = content
                 .get("source")
                 .and_then(Value::as_str)
-                .ok_or_else(|| DesignError::InvalidDesignFile("missing mermaid source".to_string()))?;
+                .ok_or_else(|| {
+                    DesignError::InvalidDesignFile("missing mermaid source".to_string())
+                })?;
             fs::write(&target, source)?;
         }
     }
@@ -608,7 +736,9 @@ pub fn export_design(
             let source = content
                 .get("source")
                 .and_then(Value::as_str)
-                .ok_or_else(|| DesignError::InvalidDesignFile("missing mermaid source".to_string()))?;
+                .ok_or_else(|| {
+                    DesignError::InvalidDesignFile("missing mermaid source".to_string())
+                })?;
             fs::write(target_path, source)?;
         }
     }
@@ -663,6 +793,67 @@ mod tests {
         create_project(&root, "Plans").unwrap();
         let err = create_project(&root, "Plans").unwrap_err();
         assert!(matches!(err, DesignError::AlreadyExists(_)));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn stores_project_presentation_visibility() {
+        let root = test_root("project-presentation-visibility");
+        let project = create_project(&root, "Reference").unwrap();
+
+        assert!(!project.visible_in_presentation_mode);
+
+        let updated = set_project_visibility(&root, "Reference", true).unwrap();
+        assert!(updated.visible_in_presentation_mode);
+
+        let projects = list_projects(&root).unwrap();
+        assert_eq!(projects[0].name, "Reference");
+        assert!(projects[0].visible_in_presentation_mode);
+
+        let duplicated = duplicate_project(&root, "Reference", "Reference Copy").unwrap();
+        assert!(duplicated.visible_in_presentation_mode);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn backs_up_design_library_to_a_selected_folder() {
+        let root = test_root("backup-source");
+        let backup_root = test_root("backup-target");
+        create_project(&root, "Reference").unwrap();
+        set_project_visibility(&root, "Reference", true).unwrap();
+        create_design(&root, "Reference", "Flow", DesignKind::Excalidraw).unwrap();
+        create_design(&root, "Reference", "Routing", DesignKind::Mermaid).unwrap();
+        fs::write(root.join("Reference").join("notes.md"), "# local notes\n").unwrap();
+
+        let result = backup_library(&root, &backup_root).unwrap();
+
+        assert_eq!(result.project_count, 1);
+        assert_eq!(result.file_count, 3);
+        assert!(backup_root
+            .join("Reference")
+            .join("Flow.excalidraw")
+            .exists());
+        assert!(backup_root.join("Reference").join("Routing.mmd").exists());
+        assert!(backup_root
+            .join("Reference")
+            .join(PROJECT_METADATA_FILE)
+            .exists());
+        assert!(!backup_root.join("Reference").join("notes.md").exists());
+
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(backup_root).unwrap();
+    }
+
+    #[test]
+    fn rejects_backup_targets_inside_the_live_library() {
+        let root = test_root("backup-target-validation");
+        create_project(&root, "Reference").unwrap();
+
+        let err = backup_library(&root, &root.join("Backup")).unwrap_err();
+
+        assert!(matches!(err, DesignError::InvalidBackupTarget(_)));
+
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -788,6 +979,21 @@ mod tests {
     }
 
     #[test]
+    fn ignores_markdown_files_in_project_directories() {
+        let root = test_root("ignore-markdown");
+        create_project(&root, "Discovery").unwrap();
+        create_design(&root, "Discovery", "Sketch", DesignKind::Excalidraw).unwrap();
+        fs::write(root.join("Discovery").join("notes.md"), "# Local notes\n").unwrap();
+
+        let designs = list_designs(&root, "Discovery").unwrap();
+
+        assert_eq!(designs.len(), 1);
+        assert_eq!(designs[0].file_name, "Sketch.excalidraw");
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn rejects_design_name_conflicts() {
         let root = test_root("design-conflicts");
         create_project(&root, "Ideas").unwrap();
@@ -797,7 +1003,8 @@ mod tests {
         let rename_err = rename_design(&root, "Ideas", "Sketch.excalidraw", "Other").unwrap_err();
         assert!(matches!(rename_err, DesignError::AlreadyExists(_)));
 
-        let duplicate_err = duplicate_design(&root, "Ideas", "Sketch.excalidraw", "Other").unwrap_err();
+        let duplicate_err =
+            duplicate_design(&root, "Ideas", "Sketch.excalidraw", "Other").unwrap_err();
         assert!(matches!(duplicate_err, DesignError::AlreadyExists(_)));
 
         fs::remove_dir_all(root).unwrap();
@@ -815,7 +1022,8 @@ mod tests {
             "elements": [],
             "files": {}
         });
-        let write_err = write_design(&root, "App", "Broken.excalidraw", &missing_app_state).unwrap_err();
+        let write_err =
+            write_design(&root, "App", "Broken.excalidraw", &missing_app_state).unwrap_err();
         assert!(matches!(write_err, DesignError::InvalidDesignFile(_)));
 
         let invalid_on_disk = json!({

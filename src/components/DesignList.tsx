@@ -48,9 +48,24 @@ export function DesignList({
   onDeleteDesign,
   onOpenDesign,
 }: DesignListProps) {
+  const kindLabel = (kind: DesignSummary["kind"]) => {
+    switch (kind) {
+      case "mermaid":
+        return "Mermaid";
+      case "excalidraw":
+        return "Excalidraw";
+    }
+  };
+
   if (!project) {
     return <section className="empty-state">Create a project to start drawing.</section>;
   }
+
+  const shortcutKeycap = (shortcut: string) => (
+    <span className="shortcut-keycap" aria-hidden="true">
+      {shortcut}
+    </span>
+  );
 
   return (
     <section className="design-panel">
@@ -64,8 +79,8 @@ export function DesignList({
             type="button"
             className="icon-button"
             onClick={onConfigureAi}
-            aria-label="AI settings"
-            title="AI settings"
+            aria-label="Settings"
+            title="Settings"
           >
             <Settings size={16} />
           </button>
@@ -77,16 +92,26 @@ export function DesignList({
             <Upload size={16} />
             Import design
           </button>
+          <button
+            type="button"
+            onClick={onCreateDesign}
+            title="New Excalidraw (1)"
+          >
+            <FilePlus2 size={16} />
+            <span className="create-action-label">New Excalidraw</span>
+            {shortcutKeycap("1")}
+          </button>
           {enableMermaid ? (
-            <button type="button" onClick={onCreateMermaidDesign}>
+            <button
+              type="button"
+              onClick={onCreateMermaidDesign}
+              title="New Mermaid (2)"
+            >
               <Workflow size={16} />
-              New Mermaid flowchart
+              <span className="create-action-label">New Mermaid</span>
+              {shortcutKeycap("2")}
             </button>
           ) : null}
-          <button type="button" onClick={onCreateDesign}>
-            <FilePlus2 size={16} />
-            New design
-          </button>
         </div>
       </header>
       <input
@@ -107,7 +132,7 @@ export function DesignList({
           {designs.map((design) => (
             <div
               key={design.fileName}
-              className="design-row"
+              className={`design-row design-row-${design.kind}`}
             >
               <button
                 type="button"
@@ -116,7 +141,7 @@ export function DesignList({
               >
                 <span className="design-name">{design.name}</span>
                 <span className={`design-kind ${design.kind}`}>
-                  {design.kind === "mermaid" ? "Mermaid" : "Excalidraw"}
+                  {kindLabel(design.kind)}
                 </span>
                 <span className="design-updated">
                   {new Date(Number(design.updatedAtMs)).toLocaleString()}

@@ -1,11 +1,11 @@
 # BanguesesDraw
 
-BanguesesDraw is a local-first desktop design manager powered by Excalidraw. It gives you a simple library for organizing projects and designs, while keeping every drawing file on your own machine.
+BanguesesDraw is a local-first desktop project workspace powered by Excalidraw. It gives you a simple library for organizing diagram projects while keeping every file on your own machine.
 
 ## What It Does
 
 - Create, rename, duplicate, and delete projects.
-- Create, rename, duplicate, and delete designs inside each project.
+- Create, rename, duplicate, and delete diagrams inside each project.
 - Draw with the full Excalidraw canvas experience.
 - Autosave designs locally as `.excalidraw` files.
 - Create and edit Mermaid flowcharts as local `.mmd` files.
@@ -14,7 +14,10 @@ BanguesesDraw is a local-first desktop design manager powered by Excalidraw. It 
 - Convert supported Mermaid flowcharts into editable Excalidraw designs.
 - Insert ready-made Twilio architecture blocks into Excalidraw diagrams.
 - Import existing Excalidraw or Mermaid files into a project.
-- Export individual designs for backup, sharing, or moving between machines.
+- Export individual artifacts for backup, sharing, or moving between machines.
+- Back up the full local library to a chosen folder, including Google Drive folders.
+- Hide private projects during screen-sharing with presentation mode.
+- Mark selected projects as visible in presentation mode, useful for reference architectures.
 - Toggle Mermaid support on or off from settings.
 - Cancel dialogs with Escape.
 - Build native installers for macOS and Windows.
@@ -38,6 +41,14 @@ Design files are stored locally in your user Documents folder:
 
 Each Excalidraw design is saved as a separate `.excalidraw` file. Mermaid flowcharts are saved as separate `.mmd` files. No cloud sync, account, or remote storage is required.
 
+Project presentation visibility is also stored locally in each project folder using a small `.banguesesdraw-project.json` metadata file.
+
+## Local Backup
+
+BanguesesDraw can copy your local library to a backup folder from **Settings**. Choose a folder once, such as a Google Drive folder, then use **Back up now** whenever you want to copy the current projects and diagrams there.
+
+Backup is one-way in this version: local library to backup folder. It copies Excalidraw files, Mermaid files, and project metadata, but it does not restore automatically or delete files from the backup folder. This keeps offline use unchanged and avoids accidental overwrites from cloud sync conflicts.
+
 ## Excalidraw Designs
 
 Excalidraw designs are the default design type. They use the embedded Excalidraw editor, so you get the familiar sketch-style drawing workflow, keyboard shortcuts, library tools, and editable canvas elements.
@@ -51,6 +62,22 @@ BanguesesDraw adds a local design-manager layer around Excalidraw:
 - import and export
 - AI modification
 - Twilio component templates
+
+## Presentation Mode
+
+The project sidebar includes a presentation mode toggle for screen-sharing. When enabled, private projects are hidden from the sidebar so their names are not visible and cannot be selected accidentally. The currently open project remains visible so you do not lose your place.
+
+Each project has a visibility flag in the sidebar. Use it to keep non-sensitive projects, such as reference architecture folders, visible even while presentation mode is enabled. Projects are private by default unless you mark them as visible.
+
+## Keyboard Shortcuts
+
+In the project library:
+
+- `1` creates a new Excalidraw diagram.
+- `2` creates a new Mermaid diagram, when Mermaid is enabled.
+- `Escape` cancels open dialogs.
+
+Inside Excalidraw, the standard Excalidraw shortcuts still apply, including tool shortcuts for selection, shapes, drawing, text, and pan/hand mode.
 
 ## Twilio Component Templates
 
@@ -97,13 +124,13 @@ AI requests are sent to OpenAI only when you explicitly use an AI action. Regula
 
 ## Import And Export
 
-BanguesesDraw supports single-design import and export:
+BanguesesDraw supports single-artifact import and export:
 
 - import `.excalidraw` files into the selected project
 - import `.mmd` Mermaid files into the selected project
-- export an individual design for backup or sharing
+- export an individual artifact for backup or sharing
 
-If an imported design name already exists, BanguesesDraw creates a conflict-safe copy name instead of overwriting the existing file.
+If an imported artifact name already exists, BanguesesDraw creates a conflict-safe copy name instead of overwriting the existing file.
 
 ## Install
 
@@ -205,4 +232,6 @@ The workflows run on pushes to `main` and can also be started manually from GitH
 
 ## License
 
-Private/internal project unless a license is added.
+Source-available, all rights reserved. The source code may be viewed, but may
+not be copied, modified, distributed, sublicensed, sold, hosted as a service, or
+otherwise used without prior written permission. See [LICENSE](LICENSE).

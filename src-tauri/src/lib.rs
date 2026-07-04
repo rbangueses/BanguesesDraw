@@ -1,6 +1,6 @@
 pub mod designs;
 
-use designs::{DesignKind, DesignScene, DesignSummary, ProjectSummary};
+use designs::{BackupResult, DesignKind, DesignScene, DesignSummary, ProjectSummary};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
@@ -54,6 +54,16 @@ fn delete_project(app: tauri::AppHandle, name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn set_project_visibility(
+    app: tauri::AppHandle,
+    name: String,
+    visible_in_presentation_mode: bool,
+) -> Result<ProjectSummary, String> {
+    designs::set_project_visibility(&designs_root(&app)?, &name, visible_in_presentation_mode)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn list_designs(app: tauri::AppHandle, project: String) -> Result<Vec<DesignSummary>, String> {
     designs::list_designs(&designs_root(&app)?, &project).map_err(|error| error.to_string())
 }
@@ -71,7 +81,7 @@ fn create_design(
         &name,
         kind.unwrap_or(DesignKind::Excalidraw),
     )
-        .map_err(|error| error.to_string())
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -113,8 +123,13 @@ fn duplicate_design(
     source_file_name: String,
     target_name: String,
 ) -> Result<DesignSummary, String> {
-    designs::duplicate_design(&designs_root(&app)?, &project, &source_file_name, &target_name)
-        .map_err(|error| error.to_string())
+    designs::duplicate_design(
+        &designs_root(&app)?,
+        &project,
+        &source_file_name,
+        &target_name,
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -149,6 +164,12 @@ fn export_design(
     .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn backup_library(app: tauri::AppHandle, target_path: String) -> Result<BackupResult, String> {
+    designs::backup_library(&designs_root(&app)?, &PathBuf::from(target_path))
+        .map_err(|error| error.to_string())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -158,6 +179,7 @@ pub fn run() {
             rename_project,
             duplicate_project,
             delete_project,
+            set_project_visibility,
             list_designs,
             create_design,
             read_design,
@@ -166,7 +188,8 @@ pub fn run() {
             duplicate_design,
             delete_design,
             import_design,
-            export_design
+            export_design,
+            backup_library
         ])
         .run(tauri::generate_context!())
         .expect("error while running BanguesesDraw");
@@ -183,7 +206,9 @@ mod tests {
 
         assert_eq!(
             designs_root_from_documents(documents_dir),
-            PathBuf::from("Documents").join("BanguesesDraw").join("Designs"),
+            PathBuf::from("Documents")
+                .join("BanguesesDraw")
+                .join("Designs"),
         );
     }
 }

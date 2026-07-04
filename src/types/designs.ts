@@ -3,6 +3,12 @@ import type { ExcalidrawScene } from "./excalidraw";
 export type ProjectSummary = {
   name: string;
   designCount: number;
+  visibleInPresentationMode?: boolean;
+};
+
+export type BackupResult = {
+  projectCount: number;
+  fileCount: number;
 };
 
 export type DesignKind = "excalidraw" | "mermaid";

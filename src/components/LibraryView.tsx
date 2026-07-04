@@ -1,11 +1,17 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDesignLibrary } from "../hooks/useDesignLibrary";
 import {
   loadAiSettings,
   saveAiSettings,
   type AiSettings,
 } from "../lib/aiSettings";
+import {
+  loadBackupSettings,
+  saveBackupSettings,
+  type BackupSettings,
+} from "../lib/backupSettings";
+import { designApi } from "../lib/designApi";
 import type { DesignSummary } from "../types/designs";
 import { AiDiagramDialog } from "./AiDiagramDialog";
 import { AiSettingsDialog } from "./AiSettingsDialog";
@@ -15,9 +21,12 @@ import { ProjectSidebar } from "./ProjectSidebar";
 import { RenameDialog } from "./RenameDialog";
 
 type LibraryViewProps = {
+  initialSelectedProject?: string | null;
   openError?: string | null;
   onOpenDesign: (project: string, fileName: string) => void;
 };
+
+const PRESENTATION_MODE_STORAGE_KEY = "banguesesdraw.presentationMode";
 
 type PendingAction =
   | { type: "create-project" }
@@ -33,10 +42,34 @@ type PendingAction =
   | { type: "delete-design"; design: DesignSummary }
   | null;
 
-export function LibraryView({ openError, onOpenDesign }: LibraryViewProps) {
-  const library = useDesignLibrary();
+function isTextEntryTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return (
+    tagName === "input" ||
+    tagName === "textarea" ||
+    tagName === "select" ||
+    target.isContentEditable
+  );
+}
+
+export function LibraryView({
+  initialSelectedProject,
+  openError,
+  onOpenDesign,
+}: LibraryViewProps) {
+  const library = useDesignLibrary(initialSelectedProject);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadAiSettings());
+  const [backupSettings, setBackupSettings] = useState<BackupSettings>(() =>
+    loadBackupSettings(),
+  );
+  const [presentationMode, setPresentationMode] = useState(
+    () => localStorage.getItem(PRESENTATION_MODE_STORAGE_KEY) === "true",
+  );
 
   const closeDialog = () => setPendingAction(null);
   const designImportFilters = [
@@ -60,6 +93,39 @@ export function LibraryView({ openError, onOpenDesign }: LibraryViewProps) {
     }
   };
 
+  useEffect(() => {
+    localStorage.setItem(
+      PRESENTATION_MODE_STORAGE_KEY,
+      String(presentationMode),
+    );
+  }, [presentationMode]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        pendingAction ||
+        !library.selectedProject ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isTextEntryTarget(event.target)
+      ) {
+        return;
+      }
+
+      if (event.key === "1") {
+        event.preventDefault();
+        setPendingAction({ type: "create-design" });
+      } else if (event.key === "2" && aiSettings.enableMermaid) {
+        event.preventDefault();
+        setPendingAction({ type: "create-mermaid-design" });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [aiSettings.enableMermaid, library.selectedProject, pendingAction]);
+
   const handleExportDesign = async (design: DesignSummary) => {
     const exportFilters =
       design.kind === "mermaid"
@@ -76,11 +142,28 @@ export function LibraryView({ openError, onOpenDesign }: LibraryViewProps) {
     }
   };
 
+  const handleChooseBackupFolder = async () => {
+    const selectedPath = await open({
+      title: "Choose backup folder",
+      directory: true,
+      multiple: false,
+    });
+
+    return typeof selectedPath === "string" ? selectedPath : null;
+  };
+
   return (
     <div className="library-view">
       <ProjectSidebar
         projects={library.projects}
         selectedProject={library.selectedProject}
+        presentationMode={presentationMode}
+        onTogglePresentationMode={() =>
+          setPresentationMode((currentMode) => !currentMode)
+        }
+        onSetProjectVisibility={(project, visible) => {
+          void library.setProjectVisibility(project, visible).catch(() => undefined);
+        }}
         onSelectProject={library.setSelectedProject}
         onCreateProject={() => setPendingAction({ type: "create-project" })}
         onRenameProject={(project) => setPendingAction({ type: "rename-project", project })}
@@ -137,8 +220,8 @@ export function LibraryView({ openError, onOpenDesign }: LibraryViewProps) {
       ) : null}
       {pendingAction?.type === "create-design" ? (
         <RenameDialog
-          title="Create design"
-          inputLabel="Design name"
+          title="Create Excalidraw"
+          inputLabel="Excalidraw name"
           submitLabel="Create"
           onCancel={closeDialog}
           onSubmit={async (name) => {
@@ -152,8 +235,8 @@ export function LibraryView({ openError, onOpenDesign }: LibraryViewProps) {
       ) : null}
       {pendingAction?.type === "create-mermaid-design" ? (
         <RenameDialog
-          title="Create Mermaid flowchart"
-          inputLabel="Flowchart name"
+          title="Create Mermaid"
+          inputLabel="Mermaid name"
           submitLabel="Create"
           onCancel={closeDialog}
           onSubmit={async (name) => {
@@ -191,10 +274,15 @@ export function LibraryView({ openError, onOpenDesign }: LibraryViewProps) {
       {pendingAction?.type === "ai-settings" ? (
         <AiSettingsDialog
           settings={aiSettings}
+          backupSettings={backupSettings}
           onCancel={closeDialog}
-          onSave={(settings) => {
+          onChooseBackupFolder={handleChooseBackupFolder}
+          onBackUpNow={designApi.backupLibrary}
+          onSave={(settings, nextBackupSettings) => {
             saveAiSettings(settings);
+            saveBackupSettings(nextBackupSettings);
             setAiSettings(settings);
+            setBackupSettings(nextBackupSettings);
             closeDialog();
           }}
         />

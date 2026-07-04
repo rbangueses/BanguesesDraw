@@ -26,9 +26,11 @@ type OpenDesign =
 export default function App() {
   const [openDesign, setOpenDesign] = useState<OpenDesign | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
+  const [lastSelectedProject, setLastSelectedProject] = useState<string | null>(null);
 
   async function handleOpenDesign(project: string, fileName: string) {
     setOpenError(null);
+    setLastSelectedProject(project);
 
     try {
       const design = await designApi.readDesign(project, fileName);
@@ -45,7 +47,7 @@ export default function App() {
       }
 
       if (design.kind !== "excalidraw" || !isExcalidrawScene(design.content)) {
-        throw new Error("Invalid Excalidraw scene.");
+        throw new Error("Unsupported design type.");
       }
 
       setOpenDesign({
@@ -86,6 +88,7 @@ export default function App() {
         />
       ) : (
         <LibraryView
+          initialSelectedProject={lastSelectedProject}
           openError={openError}
           onOpenDesign={(project, fileName) => void handleOpenDesign(project, fileName)}
         />

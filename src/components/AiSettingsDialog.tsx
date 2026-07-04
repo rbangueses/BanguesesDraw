@@ -8,17 +8,27 @@ import {
   type AiQuality,
   type AiSettings,
 } from "../lib/aiSettings";
+import type { BackupSettings } from "../lib/backupSettings";
 import { useDialogEscape } from "./useDialogEscape";
 
 type AiSettingsDialogProps = {
   settings: AiSettings;
+  backupSettings: BackupSettings;
   onCancel: () => void;
-  onSave: (settings: AiSettings) => void;
+  onChooseBackupFolder: () => Promise<string | null>;
+  onBackUpNow: (backupFolderPath: string) => Promise<{
+    projectCount: number;
+    fileCount: number;
+  }>;
+  onSave: (settings: AiSettings, backupSettings: BackupSettings) => void;
 };
 
 export function AiSettingsDialog({
   settings,
+  backupSettings,
   onCancel,
+  onChooseBackupFolder,
+  onBackUpNow,
   onSave,
 }: AiSettingsDialogProps) {
   const [apiKey, setApiKey] = useState(settings.apiKey);
@@ -28,6 +38,11 @@ export function AiSettingsDialog({
   const [customModel, setCustomModel] = useState(settings.customModel);
   const [quality, setQuality] = useState<AiQuality>(settings.quality);
   const [enableMermaid, setEnableMermaid] = useState(settings.enableMermaid);
+  const [backupFolderPath, setBackupFolderPath] = useState(
+    backupSettings.backupFolderPath,
+  );
+  const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const [isBackingUp, setIsBackingUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const apiKeyId = useId();
   const modelId = useId();
@@ -54,7 +69,46 @@ export function AiSettingsDialog({
     }
 
     setError(null);
-    onSave(nextSettings);
+    onSave(nextSettings, {
+      backupFolderPath: backupFolderPath.trim(),
+    });
+  }
+
+  async function handleChooseBackupFolder() {
+    const selectedPath = await onChooseBackupFolder();
+    if (!selectedPath) {
+      return;
+    }
+
+    setBackupFolderPath(selectedPath);
+    setBackupStatus(null);
+  }
+
+  async function handleBackUpNow() {
+    const cleanBackupFolderPath = backupFolderPath.trim();
+    if (!cleanBackupFolderPath) {
+      setBackupStatus("Choose a backup folder first.");
+      return;
+    }
+
+    setIsBackingUp(true);
+    setBackupStatus(null);
+    try {
+      const result = await onBackUpNow(cleanBackupFolderPath);
+      setBackupStatus(
+        `Backed up ${result.fileCount} ${result.fileCount === 1 ? "file" : "files"} across ${result.projectCount} ${
+          result.projectCount === 1 ? "project" : "projects"
+        }.`,
+      );
+    } catch (backupError) {
+      setBackupStatus(
+        backupError instanceof Error
+          ? backupError.message
+          : String(backupError),
+      );
+    } finally {
+      setIsBackingUp(false);
+    }
   }
 
   return (
@@ -63,9 +117,9 @@ export function AiSettingsDialog({
         className="dialog ai-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="AI settings"
+        aria-label="Settings"
       >
-        <h2>AI settings</h2>
+        <h2>Settings</h2>
         <form onSubmit={handleSubmit}>
           <label htmlFor={apiKeyId}>OpenAI API key</label>
           <input
@@ -123,6 +177,32 @@ export function AiSettingsDialog({
             />
             Enable Mermaid diagrams
           </label>
+
+          <section className="settings-section">
+            <h3>Backup</h3>
+            <p className="settings-help">
+              Copy the local design library to a folder you control, such as a
+              Google Drive folder.
+            </p>
+            <div className="backup-folder-row">
+              <span className="backup-folder-path">
+                {backupFolderPath.trim() || "No backup folder selected"}
+              </span>
+              <button type="button" onClick={handleChooseBackupFolder}>
+                Choose backup folder
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={handleBackUpNow}
+              disabled={isBackingUp || !backupFolderPath.trim()}
+            >
+              {isBackingUp ? "Backing up..." : "Back up now"}
+            </button>
+            {backupStatus ? (
+              <p className="settings-status">{backupStatus}</p>
+            ) : null}
+          </section>
 
           {error ? (
             <p className="form-error" id={errorId}>

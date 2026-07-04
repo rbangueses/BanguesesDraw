@@ -11,13 +11,49 @@ describe("designApi", () => {
   });
 
   it("calls list_projects", async () => {
-    invoke.mockResolvedValueOnce([{ name: "App", designCount: 2 }]);
+    invoke.mockResolvedValueOnce([
+      { name: "App", designCount: 2, visibleInPresentationMode: false },
+    ]);
     const { designApi } = await import("./designApi");
 
     await expect(designApi.listProjects()).resolves.toEqual([
-      { name: "App", designCount: 2 },
+      { name: "App", designCount: 2, visibleInPresentationMode: false },
     ]);
     expect(invoke).toHaveBeenCalledWith("list_projects");
+  });
+
+  it("updates project visibility", async () => {
+    invoke.mockResolvedValueOnce({
+      name: "Reference",
+      designCount: 3,
+      visibleInPresentationMode: true,
+    });
+    const { designApi } = await import("./designApi");
+
+    await expect(
+      designApi.setProjectVisibility("Reference", true),
+    ).resolves.toEqual({
+      name: "Reference",
+      designCount: 3,
+      visibleInPresentationMode: true,
+    });
+    expect(invoke).toHaveBeenCalledWith("set_project_visibility", {
+      name: "Reference",
+      visibleInPresentationMode: true,
+    });
+  });
+
+  it("backs up the local design library to a selected folder", async () => {
+    invoke.mockResolvedValueOnce({ projectCount: 2, fileCount: 5 });
+    const { designApi } = await import("./designApi");
+
+    await expect(designApi.backupLibrary("/tmp/BanguesesDraw Backup")).resolves.toEqual({
+      projectCount: 2,
+      fileCount: 5,
+    });
+    expect(invoke).toHaveBeenCalledWith("backup_library", {
+      targetPath: "/tmp/BanguesesDraw Backup",
+    });
   });
 
   it("calls write_design with scene content", async () => {

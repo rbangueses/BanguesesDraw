@@ -126,7 +126,7 @@ describe("DesignList", () => {
     expect(onImportDesign).toHaveBeenCalledTimes(1);
   });
 
-  it("shows type labels and a new Mermaid flowchart action", () => {
+  it("shows diagram type labels and creation actions in shortcut order", () => {
     render(
       <DesignList
         project="Docs"
@@ -163,10 +163,24 @@ describe("DesignList", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: /new mermaid flowchart/i }),
+      screen.getByRole("button", { name: /new mermaid/i }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /new excalidraw/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /new note/i })).not.toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("button")
+        .filter((button) => /^new /i.test(button.textContent ?? ""))
+        .map((button) =>
+          button.querySelector(".create-action-label")?.textContent?.trim(),
+        ),
+    ).toEqual(["New Excalidraw", "New Mermaid"]);
+    expect(
+      screen.getAllByText(/[12]/, { selector: ".shortcut-keycap" }).map((keycap) => keycap.textContent),
+    ).toEqual(["1", "2"]);
     expect(screen.getByText("Excalidraw")).toBeInTheDocument();
     expect(screen.getByText("Mermaid")).toBeInTheDocument();
+    expect(screen.queryByText("Note")).not.toBeInTheDocument();
   });
 
   it("hides the new Mermaid action when Mermaid is disabled", () => {
@@ -200,7 +214,7 @@ describe("DesignList", () => {
     );
 
     expect(
-      screen.queryByRole("button", { name: /new mermaid flowchart/i }),
+      screen.queryByRole("button", { name: /new mermaid/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Mermaid")).toBeInTheDocument();
   });

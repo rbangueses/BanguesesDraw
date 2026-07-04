@@ -55,9 +55,16 @@ textarea {
   gap: 12px;
 }
 
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .design-header-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
 }
@@ -67,6 +74,19 @@ textarea {
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+}
+
+.shortcut-keycap {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #d3d3cc;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #676b73;
+  font-size: 11px;
+  line-height: 1;
 }
 
 .dialog-actions {
@@ -85,6 +105,21 @@ textarea {
   height: 36px;
   display: grid;
   place-items: center;
+}
+
+.icon-button.privacy-active {
+  background: #202124;
+  color: #ffffff;
+}
+
+.privacy-hidden-count {
+  margin: 8px 0 12px;
+  border: 1px solid #deded8;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #f7f7f3;
+  color: #555b66;
+  font-size: 12px;
 }
 
 .project-button,
@@ -267,6 +302,43 @@ textarea {
 .dialog .checkbox-field input {
   width: auto;
   padding: 0;
+}
+
+.settings-section {
+  margin-top: 18px;
+  border-top: 1px solid #e4e2dc;
+  padding-top: 14px;
+}
+
+.settings-section h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.settings-help,
+.settings-status {
+  margin: 0 0 10px;
+  color: #5f6368;
+  font-size: 13px;
+}
+
+.backup-folder-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.backup-folder-path {
+  min-height: 36px;
+  border: 1px solid #deded8;
+  border-radius: 6px;
+  padding: 9px 10px;
+  overflow: hidden;
+  color: #3c4043;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dialog textarea {
@@ -531,6 +603,28 @@ textarea {
 }
 
 @media (max-width: 840px) {
+  .library-view {
+    grid-template-columns: 1fr;
+  }
+
+  .project-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #deded8;
+  }
+
+  .library-main {
+    padding: 16px;
+  }
+
+  .design-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .design-header-actions {
+    justify-content: flex-start;
+  }
+
   .mermaid-editor-grid {
     grid-template-columns: 1fr;
   }

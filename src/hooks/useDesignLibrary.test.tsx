@@ -10,6 +10,7 @@ vi.mock("../lib/designApi", () => ({
     renameProject: vi.fn(),
     duplicateProject: vi.fn(),
     deleteProject: vi.fn(),
+    setProjectVisibility: vi.fn(),
     createDesign: vi.fn(),
     importDesign: vi.fn(),
     exportDesign: vi.fn(),
@@ -41,6 +42,7 @@ describe("useDesignLibrary", () => {
     vi.mocked(designApi.renameProject).mockReset();
     vi.mocked(designApi.duplicateProject).mockReset();
     vi.mocked(designApi.deleteProject).mockReset();
+    vi.mocked(designApi.setProjectVisibility).mockReset();
     vi.mocked(designApi.createDesign).mockReset();
     vi.mocked(designApi.importDesign).mockReset();
     vi.mocked(designApi.exportDesign).mockReset();
@@ -78,6 +80,29 @@ describe("useDesignLibrary", () => {
     expect(result.current.selectedProject).toBe("App");
     expect(result.current.designs[0].name).toBe("Flow");
     expect(designApi.listDesigns).toHaveBeenCalledWith("App");
+  });
+
+  it("prefers an existing initial selected project when loading projects", async () => {
+    vi.mocked(designApi.listProjects).mockResolvedValueOnce([
+      { name: "First", designCount: 0 },
+      { name: "Second", designCount: 0 },
+      { name: "Third", designCount: 1 },
+    ]);
+    vi.mocked(designApi.listDesigns).mockResolvedValueOnce([
+      {
+        project: "Third",
+        name: "Flow",
+        fileName: "Flow.excalidraw",
+        kind: "excalidraw",
+        updatedAtMs: 1,
+      },
+    ]);
+
+    const { result } = renderHook(() => useDesignLibrary("Third"));
+
+    await waitFor(() => expect(result.current.selectedProject).toBe("Third"));
+
+    expect(designApi.listDesigns).toHaveBeenCalledWith("Third");
   });
 
   it("treats reselecting the active project as a no-op", async () => {
@@ -219,6 +244,40 @@ describe("useDesignLibrary", () => {
       "Routing",
       "mermaid",
     );
+  });
+
+  it("updates project presentation visibility and refreshes projects", async () => {
+    vi.mocked(designApi.listProjects)
+      .mockResolvedValueOnce([
+        {
+          name: "Reference",
+          designCount: 0,
+          visibleInPresentationMode: false,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          name: "Reference",
+          designCount: 0,
+          visibleInPresentationMode: true,
+        },
+      ]);
+    vi.mocked(designApi.listDesigns).mockResolvedValue([]);
+    vi.mocked(designApi.setProjectVisibility).mockResolvedValue({
+      name: "Reference",
+      designCount: 0,
+      visibleInPresentationMode: true,
+    });
+
+    const { result } = renderHook(() => useDesignLibrary());
+    await waitFor(() => expect(result.current.selectedProject).toBe("Reference"));
+
+    await act(async () => {
+      await result.current.setProjectVisibility("Reference", true);
+    });
+
+    expect(designApi.setProjectVisibility).toHaveBeenCalledWith("Reference", true);
+    expect(result.current.projects[0].visibleInPresentationMode).toBe(true);
   });
 
   it("clears stale designs and marks loading when createProject switches to a new project", async () => {

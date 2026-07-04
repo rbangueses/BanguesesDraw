@@ -17,7 +17,9 @@ const { open, save } = await import("@tauri-apps/plugin-dialog");
 
 function makeLibraryState() {
   return {
-    projects: [{ name: "App", designCount: 1 }],
+    projects: [
+      { name: "App", designCount: 1, visibleInPresentationMode: false },
+    ],
     designs: [
       {
         project: "App",
@@ -44,10 +46,21 @@ function makeLibraryState() {
     setSelectedProject: vi.fn(),
     setFilter: vi.fn(),
     refresh: vi.fn(),
-    createProject: vi.fn().mockResolvedValue({ name: "Ideas", designCount: 0 }),
+    createProject: vi
+      .fn()
+      .mockResolvedValue({
+        name: "Ideas",
+        designCount: 0,
+        visibleInPresentationMode: false,
+      }),
     renameProject: vi.fn(),
     duplicateProject: vi.fn(),
     deleteProject: vi.fn(),
+    setProjectVisibility: vi.fn().mockResolvedValue({
+      name: "App",
+      designCount: 1,
+      visibleInPresentationMode: true,
+    }),
     createDesign: vi.fn(),
     importDesign: vi.fn(),
     exportDesign: vi.fn(),
@@ -223,7 +236,7 @@ describe("LibraryView", () => {
     render(<LibraryView onOpenDesign={vi.fn()} />);
 
     expect(
-      screen.queryByRole("button", { name: "New Mermaid flowchart" }),
+      screen.queryByRole("button", { name: "New Mermaid" }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Import design" }));
@@ -264,6 +277,41 @@ describe("LibraryView", () => {
     });
   });
 
+  it("hides private projects in presentation mode and updates project visibility", async () => {
+    const user = userEvent.setup();
+    const library = makeLibraryState();
+    library.projects = [
+      { name: "Client A", designCount: 1, visibleInPresentationMode: false },
+      {
+        name: "Reference Architectures",
+        designCount: 3,
+        visibleInPresentationMode: true,
+      },
+      { name: "Client B", designCount: 2, visibleInPresentationMode: false },
+    ];
+    library.selectedProject = "Client A";
+    vi.mocked(useDesignLibrary).mockReturnValue(library);
+
+    render(<LibraryView onOpenDesign={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Start presentation mode" }));
+
+    const projectsNav = screen.getByRole("navigation", { name: "Projects" });
+
+    expect(within(projectsNav).getByText("Client A")).toBeVisible();
+    expect(within(projectsNav).getByText("Reference Architectures")).toBeVisible();
+    expect(within(projectsNav).queryByText("Client B")).not.toBeInTheDocument();
+    expect(screen.getByText("1 private project hidden")).toBeVisible();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Show Client A in presentation mode",
+      }),
+    );
+
+    expect(library.setProjectVisibility).toHaveBeenCalledWith("Client A", true);
+  });
+
   it("creates a Mermaid flowchart in the selected project", async () => {
     const user = userEvent.setup();
     const library = makeLibraryState();
@@ -280,14 +328,14 @@ describe("LibraryView", () => {
     render(<LibraryView onOpenDesign={onOpenDesign} />);
 
     await user.click(
-      screen.getByRole("button", { name: "New Mermaid flowchart" }),
+      screen.getByRole("button", { name: "New Mermaid" }),
     );
 
     const dialog = screen.getByRole("dialog", {
-      name: "Create Mermaid flowchart",
+      name: "Create Mermaid",
     });
     await user.type(
-      within(dialog).getByRole("textbox", { name: "Flowchart name" }),
+      within(dialog).getByRole("textbox", { name: "Mermaid name" }),
       "Routing",
     );
     await user.click(within(dialog).getByRole("button", { name: "Create" }));
@@ -296,6 +344,39 @@ describe("LibraryView", () => {
       expect(library.createDesign).toHaveBeenCalledWith("Routing", "mermaid"),
     );
     expect(onOpenDesign).toHaveBeenCalledWith("App", "Routing.mmd");
+  });
+
+  it("opens create dialogs with keyboard shortcuts when not typing", async () => {
+    const user = userEvent.setup();
+    const library = makeLibraryState();
+    vi.mocked(useDesignLibrary).mockReturnValue(library);
+
+    const { rerender } = render(<LibraryView onOpenDesign={vi.fn()} />);
+
+    await user.keyboard("1");
+    expect(
+      screen.getByRole("dialog", { name: "Create Excalidraw" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.keyboard("2");
+    expect(
+      screen.getByRole("dialog", { name: "Create Mermaid" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.keyboard("3");
+    expect(
+      screen.queryByRole("dialog", { name: "Create Mermaid" }),
+    ).not.toBeInTheDocument();
+
+    rerender(<LibraryView onOpenDesign={vi.fn()} />);
+    await user.click(screen.getByRole("textbox", { name: "Filter designs" }));
+    await user.keyboard("1");
+
+    expect(
+      screen.queryByRole("dialog", { name: "Create Excalidraw" }),
+    ).not.toBeInTheDocument();
   });
 
   it("configures AI settings and generates a design in the selected project", async () => {
@@ -333,9 +414,9 @@ describe("LibraryView", () => {
 
     render(<LibraryView onOpenDesign={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "AI settings" }));
+    await user.click(screen.getByRole("button", { name: "Settings" }));
 
-    let dialog = screen.getByRole("dialog", { name: "AI settings" });
+    let dialog = screen.getByRole("dialog", { name: "Settings" });
     await user.type(
       within(dialog).getByLabelText("OpenAI API key"),
       "sk-test",
@@ -372,6 +453,44 @@ describe("LibraryView", () => {
         }),
       ),
     );
+  });
+
+  it("chooses a backup folder and backs up the local library from settings", async () => {
+    const user = userEvent.setup();
+    const library = makeLibraryState();
+    vi.mocked(useDesignLibrary).mockReturnValue(library);
+    vi.mocked(open).mockResolvedValue("/Users/me/Google Drive/BanguesesDraw Backup");
+
+    const { designApi } = await import("../lib/designApi");
+    vi.spyOn(designApi, "backupLibrary").mockResolvedValue({
+      projectCount: 1,
+      fileCount: 2,
+    });
+
+    render(<LibraryView onOpenDesign={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Settings" });
+    await user.click(within(dialog).getByRole("button", { name: "Choose backup folder" }));
+
+    expect(open).toHaveBeenCalledWith({
+      title: "Choose backup folder",
+      directory: true,
+      multiple: false,
+    });
+    expect(
+      within(dialog).getByText("/Users/me/Google Drive/BanguesesDraw Backup"),
+    ).toBeVisible();
+
+    await user.click(within(dialog).getByRole("button", { name: "Back up now" }));
+
+    await waitFor(() =>
+      expect(designApi.backupLibrary).toHaveBeenCalledWith(
+        "/Users/me/Google Drive/BanguesesDraw Backup",
+      ),
+    );
+    expect(within(dialog).getByText("Backed up 2 files across 1 project.")).toBeVisible();
   });
 
   it("allows cancelling a stuck AI generation request", async () => {

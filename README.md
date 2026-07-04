@@ -26,11 +26,23 @@ BanguesesDraw is a local-first desktop project workspace powered by Excalidraw. 
 
 ### Project Library
 
-![BanguesesDraw project library](docs/screenshots/main%20ui.png)
+![BanguesesDraw project library](docs/screenshots/project-library.png)
 
 ### Drawing Editor
 
-![BanguesesDraw drawing editor](docs/screenshots/sample%20drawing.png)
+![BanguesesDraw drawing editor](docs/screenshots/drawing-editor.png)
+
+### Twilio Components
+
+![BanguesesDraw Twilio components picker](docs/screenshots/twilio-components.png)
+
+### Settings And Backup
+
+![BanguesesDraw settings and backup](docs/screenshots/settings-backup.png)
+
+### AI Modify
+
+![BanguesesDraw AI modify dialog](docs/screenshots/ai-modify.png)
 
 ## Local Storage
 

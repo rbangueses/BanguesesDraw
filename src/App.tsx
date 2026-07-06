@@ -3,10 +3,13 @@ import { AppShell } from "./components/AppShell";
 import { EditorView } from "./components/EditorView";
 import { LibraryView } from "./components/LibraryView";
 import { MermaidEditorView } from "./components/MermaidEditorView";
+import { NoteEditorView } from "./components/NoteEditorView";
 import { designApi } from "./lib/designApi";
 import { prepareSceneForExcalidraw } from "./lib/excalidrawScene";
 import { normaliseMermaidContent } from "./lib/mermaidSource";
+import { normaliseNoteContent } from "./lib/noteContent";
 import { isExcalidrawScene } from "./lib/sceneValidation";
+import type { NoteDesignContent } from "./types/designs";
 import type { ExcalidrawScene } from "./types/excalidraw";
 
 type OpenDesign =
@@ -21,6 +24,12 @@ type OpenDesign =
       project: string;
       fileName: string;
       initialSource: string;
+    }
+  | {
+      kind: "note";
+      project: string;
+      fileName: string;
+      initialContent: NoteDesignContent;
     };
 
 export default function App() {
@@ -42,6 +51,16 @@ export default function App() {
           project,
           fileName,
           initialSource: content.source,
+        });
+        return;
+      }
+
+      if (design.kind === "note") {
+        setOpenDesign({
+          kind: "note",
+          project,
+          fileName,
+          initialContent: normaliseNoteContent(design.content),
         });
         return;
       }
@@ -84,6 +103,16 @@ export default function App() {
           }
           onOpenExcalidraw={(project, fileName, initialScene) =>
             setOpenDesign({ kind: "excalidraw", project, fileName, initialScene })
+          }
+        />
+      ) : openDesign?.kind === "note" ? (
+        <NoteEditorView
+          project={openDesign.project}
+          fileName={openDesign.fileName}
+          initialContent={openDesign.initialContent}
+          onBack={() => setOpenDesign(null)}
+          onDesignMoved={(project, fileName, initialContent) =>
+            setOpenDesign({ kind: "note", project, fileName, initialContent })
           }
         />
       ) : (

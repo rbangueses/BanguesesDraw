@@ -58,7 +58,7 @@ const QUALITY_TO_MAX_OUTPUT_TOKENS: Record<AiQuality, number> = {
 };
 
 const SYSTEM_PROMPT = [
-  "You generate Excalidraw scene JSON for BanguesesDraw.",
+  "You generate Excalidraw scene JSON for DesignBuddy.",
   "Return only one valid JSON object. Do not wrap it in Markdown.",
   'The root object must have type "excalidraw", an elements array, appState object, and files object.',
   "Generate compact JSON with no unused fields and no explanatory prose.",
@@ -68,7 +68,7 @@ const SYSTEM_PROMPT = [
 ].join("\n");
 
 const MODIFY_SYSTEM_PROMPT = [
-  "You modify existing Excalidraw scene JSON for BanguesesDraw.",
+  "You modify existing Excalidraw scene JSON for DesignBuddy.",
   "Return only one complete valid JSON object. Do not wrap it in Markdown.",
   'The root object must have type "excalidraw", an elements array, appState object, and files object.',
   "Preserve the user's existing diagram intent and style unless the instruction asks otherwise.",
@@ -88,7 +88,7 @@ const MERMAID_SYSTEM_PROMPT = [
 ].join("\n");
 
 const MERMAID_MODIFY_SYSTEM_PROMPT = [
-  "You modify Mermaid flowchart source for BanguesesDraw.",
+  "You modify Mermaid flowchart source for DesignBuddy.",
   "Return only the full updated Mermaid text with no Markdown fence.",
   "Use only flowchart LR or flowchart TD.",
   "Preserve existing labels and structure unless the instruction asks otherwise.",

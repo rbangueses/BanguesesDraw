@@ -1,7 +1,9 @@
 import {
   Bot,
+  ChevronDown,
   Copy,
   Download,
+  FileText,
   FilePlus2,
   Pencil,
   Settings,
@@ -9,6 +11,7 @@ import {
   Upload,
   Workflow,
 } from "lucide-react";
+import { useState } from "react";
 import type { DesignSummary } from "../types/designs";
 
 type DesignListProps = {
@@ -18,6 +21,7 @@ type DesignListProps = {
   filter: string;
   enableMermaid?: boolean;
   onFilterChange: (filter: string) => void;
+  onCreateNote: () => void;
   onCreateDesign: () => void;
   onCreateMermaidDesign: () => void;
   onCreateAiDesign: () => void;
@@ -37,6 +41,7 @@ export function DesignList({
   filter,
   enableMermaid = true,
   onFilterChange,
+  onCreateNote,
   onCreateDesign,
   onCreateMermaidDesign,
   onCreateAiDesign,
@@ -48,10 +53,13 @@ export function DesignList({
   onDeleteDesign,
   onOpenDesign,
 }: DesignListProps) {
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const kindLabel = (kind: DesignSummary["kind"]) => {
     switch (kind) {
       case "mermaid":
         return "Mermaid";
+      case "note":
+        return "Note";
       case "excalidraw":
         return "Excalidraw";
     }
@@ -67,6 +75,11 @@ export function DesignList({
     </span>
   );
 
+  const runCreateAction = (action: () => void) => {
+    setIsCreateMenuOpen(false);
+    action();
+  };
+
   return (
     <section className="design-panel">
       <header className="design-panel-header">
@@ -75,43 +88,78 @@ export function DesignList({
           <h2>{project}</h2>
         </div>
         <div className="design-header-actions">
-          <button
-            type="button"
-            className="icon-button"
-            onClick={onConfigureAi}
-            aria-label="Settings"
-            title="Settings"
-          >
-            <Settings size={16} />
-          </button>
-          <button type="button" onClick={onCreateAiDesign}>
-            <Bot size={16} />
-            AI diagram
-          </button>
-          <button type="button" onClick={onImportDesign}>
-            <Upload size={16} />
-            Import design
-          </button>
-          <button
-            type="button"
-            onClick={onCreateDesign}
-            title="New Excalidraw (1)"
-          >
-            <FilePlus2 size={16} />
-            <span className="create-action-label">New Excalidraw</span>
-            {shortcutKeycap("1")}
-          </button>
-          {enableMermaid ? (
+          <div className="toolbar-action-group">
             <button
               type="button"
-              onClick={onCreateMermaidDesign}
-              title="New Mermaid (2)"
+              className="icon-button"
+              onClick={onConfigureAi}
+              aria-label="Settings"
+              title="Settings"
             >
-              <Workflow size={16} />
-              <span className="create-action-label">New Mermaid</span>
-              {shortcutKeycap("2")}
+              <Settings size={16} />
             </button>
-          ) : null}
+            <button
+              type="button"
+              onClick={onImportDesign}
+              aria-label="Import design"
+              title="Import design"
+            >
+              <Upload size={16} />
+              Import
+            </button>
+          </div>
+          <div className="toolbar-action-group">
+            <button type="button" onClick={onCreateAiDesign}>
+              <Bot size={16} />
+              AI diagram
+            </button>
+          </div>
+          <div className="toolbar-action-group create-menu-wrap">
+            <button
+              type="button"
+              className="primary-button create-menu-trigger"
+              onClick={() => setIsCreateMenuOpen((isOpen) => !isOpen)}
+              aria-expanded={isCreateMenuOpen}
+              aria-haspopup="menu"
+            >
+              <FilePlus2 size={16} />
+              New
+              <ChevronDown size={15} />
+            </button>
+            {isCreateMenuOpen ? (
+              <div className="create-menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => runCreateAction(onCreateNote)}
+                >
+                  <FileText size={16} />
+                  <span className="create-action-label">Note</span>
+                  {shortcutKeycap("1")}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => runCreateAction(onCreateDesign)}
+                >
+                  <FilePlus2 size={16} />
+                  <span className="create-action-label">Excalidraw</span>
+                  {shortcutKeycap("2")}
+                </button>
+                {enableMermaid ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => runCreateAction(onCreateMermaidDesign)}
+                  >
+                    <Workflow size={16} />
+                    <span className="create-action-label">Mermaid</span>
+                    {shortcutKeycap("3")}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
       <input

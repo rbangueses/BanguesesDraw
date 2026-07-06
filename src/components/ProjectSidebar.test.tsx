@@ -86,4 +86,29 @@ describe("ProjectSidebar", () => {
       false,
     );
   });
+
+  it("filters projects from the sidebar search", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ProjectSidebar
+        projects={projects}
+        selectedProject="Customer A"
+        presentationMode={false}
+        onTogglePresentationMode={vi.fn()}
+        onSetProjectVisibility={vi.fn()}
+        onSelectProject={vi.fn()}
+        onCreateProject={vi.fn()}
+        onRenameProject={vi.fn()}
+        onDuplicateProject={vi.fn()}
+        onDeleteProject={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByRole("searchbox", { name: "Search projects" }), "ref");
+
+    expect(screen.queryByText("Customer A")).not.toBeInTheDocument();
+    expect(screen.getByText("Reference Architectures")).toBeVisible();
+    expect(screen.queryByText("Customer B")).not.toBeInTheDocument();
+  });
 });

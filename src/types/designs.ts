@@ -11,13 +11,28 @@ export type BackupResult = {
   fileCount: number;
 };
 
-export type DesignKind = "excalidraw" | "mermaid";
+export type DesignKind = "excalidraw" | "mermaid" | "note";
 
 export type MermaidDesignContent = {
   source: string;
 };
 
-export type DesignContent = ExcalidrawScene | MermaidDesignContent;
+export type NoteDocument = {
+  type: "doc";
+  content?: unknown[];
+  [key: string]: unknown;
+};
+
+export type NoteDesignContent = {
+  type: "banguesesdraw-note";
+  version: number;
+  content: NoteDocument;
+};
+
+export type DesignContent =
+  | ExcalidrawScene
+  | MermaidDesignContent
+  | NoteDesignContent;
 
 export type DesignSummary = {
   project: string;

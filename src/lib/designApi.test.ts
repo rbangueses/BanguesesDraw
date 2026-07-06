@@ -47,12 +47,12 @@ describe("designApi", () => {
     invoke.mockResolvedValueOnce({ projectCount: 2, fileCount: 5 });
     const { designApi } = await import("./designApi");
 
-    await expect(designApi.backupLibrary("/tmp/BanguesesDraw Backup")).resolves.toEqual({
+    await expect(designApi.backupLibrary("/tmp/DesignBuddy Backup")).resolves.toEqual({
       projectCount: 2,
       fileCount: 5,
     });
     expect(invoke).toHaveBeenCalledWith("backup_library", {
-      targetPath: "/tmp/BanguesesDraw Backup",
+      targetPath: "/tmp/DesignBuddy Backup",
     });
   });
 
@@ -97,6 +97,29 @@ describe("designApi", () => {
       project: "Docs",
       name: "Flow",
       kind: "mermaid",
+    });
+  });
+
+  it("passes design kind when creating a rich text note", async () => {
+    invoke.mockResolvedValueOnce({
+      project: "Docs",
+      name: "Meeting notes",
+      fileName: "Meeting notes.bdnote",
+      kind: "note",
+      content: {
+        type: "banguesesdraw-note",
+        version: 1,
+        content: { type: "doc", content: [] },
+      },
+    });
+    const { designApi } = await import("./designApi");
+
+    await designApi.createDesign("Docs", "Meeting notes", "note");
+
+    expect(invoke).toHaveBeenCalledWith("create_design", {
+      project: "Docs",
+      name: "Meeting notes",
+      kind: "note",
     });
   });
 

@@ -210,8 +210,8 @@ describe("LibraryView", () => {
       multiple: false,
       filters: [
         {
-          name: "BanguesesDraw designs",
-          extensions: ["excalidraw", "json", "mmd"],
+          name: "DesignBuddy artifacts",
+          extensions: ["excalidraw", "json", "mmd", "bdnote"],
         },
       ],
     });
@@ -246,8 +246,8 @@ describe("LibraryView", () => {
       multiple: false,
       filters: [
         {
-          name: "BanguesesDraw designs",
-          extensions: ["excalidraw", "json"],
+          name: "DesignBuddy artifacts",
+          extensions: ["excalidraw", "json", "bdnote"],
         },
       ],
     });
@@ -327,9 +327,8 @@ describe("LibraryView", () => {
 
     render(<LibraryView onOpenDesign={onOpenDesign} />);
 
-    await user.click(
-      screen.getByRole("button", { name: "New Mermaid" }),
-    );
+    await user.click(screen.getByRole("button", { name: "New" }));
+    await user.click(screen.getByRole("menuitem", { name: /Mermaid/ }));
 
     const dialog = screen.getByRole("dialog", {
       name: "Create Mermaid",
@@ -346,6 +345,43 @@ describe("LibraryView", () => {
     expect(onOpenDesign).toHaveBeenCalledWith("App", "Routing.mmd");
   });
 
+  it("creates a rich text note in the selected project", async () => {
+    const user = userEvent.setup();
+    const library = makeLibraryState();
+    const onOpenDesign = vi.fn();
+    library.createDesign.mockResolvedValue({
+      project: "App",
+      name: "Meeting notes",
+      fileName: "Meeting notes.bdnote",
+      kind: "note",
+      content: {
+        type: "banguesesdraw-note",
+        version: 1,
+        content: { type: "doc", content: [] },
+      },
+    });
+    vi.mocked(useDesignLibrary).mockReturnValue(library);
+
+    render(<LibraryView onOpenDesign={onOpenDesign} />);
+
+    await user.click(screen.getByRole("button", { name: "New" }));
+    await user.click(screen.getByRole("menuitem", { name: /Note/ }));
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Create Note",
+    });
+    await user.type(
+      within(dialog).getByRole("textbox", { name: "Note name" }),
+      "Meeting notes",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Create" }));
+
+    await waitFor(() =>
+      expect(library.createDesign).toHaveBeenCalledWith("Meeting notes", "note"),
+    );
+    expect(onOpenDesign).toHaveBeenCalledWith("App", "Meeting notes.bdnote");
+  });
+
   it("opens create dialogs with keyboard shortcuts when not typing", async () => {
     const user = userEvent.setup();
     const library = makeLibraryState();
@@ -355,27 +391,28 @@ describe("LibraryView", () => {
 
     await user.keyboard("1");
     expect(
-      screen.getByRole("dialog", { name: "Create Excalidraw" }),
+      screen.getByRole("dialog", { name: "Create Note" }),
     ).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
     await user.keyboard("2");
     expect(
-      screen.getByRole("dialog", { name: "Create Mermaid" }),
+      screen.getByRole("dialog", { name: "Create Excalidraw" }),
     ).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
     await user.keyboard("3");
     expect(
-      screen.queryByRole("dialog", { name: "Create Mermaid" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("dialog", { name: "Create Mermaid" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
 
     rerender(<LibraryView onOpenDesign={vi.fn()} />);
     await user.click(screen.getByRole("textbox", { name: "Filter designs" }));
     await user.keyboard("1");
 
     expect(
-      screen.queryByRole("dialog", { name: "Create Excalidraw" }),
+      screen.queryByRole("dialog", { name: "Create Note" }),
     ).not.toBeInTheDocument();
   });
 
@@ -459,7 +496,7 @@ describe("LibraryView", () => {
     const user = userEvent.setup();
     const library = makeLibraryState();
     vi.mocked(useDesignLibrary).mockReturnValue(library);
-    vi.mocked(open).mockResolvedValue("/Users/me/Google Drive/BanguesesDraw Backup");
+    vi.mocked(open).mockResolvedValue("/Users/me/Google Drive/DesignBuddy Backup");
 
     const { designApi } = await import("../lib/designApi");
     vi.spyOn(designApi, "backupLibrary").mockResolvedValue({
@@ -480,14 +517,14 @@ describe("LibraryView", () => {
       multiple: false,
     });
     expect(
-      within(dialog).getByText("/Users/me/Google Drive/BanguesesDraw Backup"),
+      within(dialog).getByText("/Users/me/Google Drive/DesignBuddy Backup"),
     ).toBeVisible();
 
     await user.click(within(dialog).getByRole("button", { name: "Back up now" }));
 
     await waitFor(() =>
       expect(designApi.backupLibrary).toHaveBeenCalledWith(
-        "/Users/me/Google Drive/BanguesesDraw Backup",
+        "/Users/me/Google Drive/DesignBuddy Backup",
       ),
     );
     expect(within(dialog).getByText("Backed up 2 files across 1 project.")).toBeVisible();

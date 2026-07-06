@@ -6,7 +6,17 @@ use std::path::{Path, PathBuf};
 use tauri::Manager;
 
 fn designs_root_from_documents(documents_dir: &Path) -> PathBuf {
-    documents_dir.join("BanguesesDraw").join("Designs")
+    let new_root = documents_dir.join("DesignBuddy").join("Designs");
+    let old_root = documents_dir.join("BanguesesDraw").join("Designs");
+
+    if !new_root.exists() && old_root.exists() {
+        if let Some(parent) = new_root.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::rename(&old_root, &new_root);
+    }
+
+    new_root
 }
 
 fn designs_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -192,7 +202,7 @@ pub fn run() {
             backup_library
         ])
         .run(tauri::generate_context!())
-        .expect("error while running BanguesesDraw");
+        .expect("error while running DesignBuddy");
 }
 
 #[cfg(test)]
@@ -207,8 +217,28 @@ mod tests {
         assert_eq!(
             designs_root_from_documents(documents_dir),
             PathBuf::from("Documents")
-                .join("BanguesesDraw")
+                .join("DesignBuddy")
                 .join("Designs"),
         );
+    }
+
+    #[test]
+    fn migrates_existing_banguesesdraw_designs_to_designbuddy() {
+        let documents_dir = std::env::temp_dir().join(format!(
+            "designbuddy-migration-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let old_root = documents_dir.join("BanguesesDraw").join("Designs");
+        let new_root = documents_dir.join("DesignBuddy").join("Designs");
+        std::fs::create_dir_all(&old_root).unwrap();
+
+        assert_eq!(designs_root_from_documents(&documents_dir), new_root);
+        assert!(new_root.exists());
+        assert!(!old_root.exists());
+
+        std::fs::remove_dir_all(documents_dir).unwrap();
     }
 }

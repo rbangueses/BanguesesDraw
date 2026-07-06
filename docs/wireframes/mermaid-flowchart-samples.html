@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Supported Mermaid Flowchart Samples</title>
+    <style>
+      :root {
+        color: #202124;
+        background: #f6f6f2;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      header {
+        border-bottom: 1px solid #deded6;
+        background: #ffffff;
+        padding: 22px 28px;
+      }
+
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .subtitle {
+        max-width: 760px;
+        margin-top: 8px;
+        color: #676b73;
+        line-height: 1.5;
+      }
+
+      .support-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .pill {
+        border: 1px solid #d7d7d0;
+        border-radius: 999px;
+        background: #f8f8f4;
+        padding: 6px 10px;
+        color: #3c4043;
+        font-size: 13px;
+      }
+
+      .section-title {
+        margin: 28px 0 12px;
+      }
+
+      .sample-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .sample {
+        border: 1px solid #deded6;
+        border-radius: 8px;
+        background: #ffffff;
+        overflow: hidden;
+      }
+
+      .sample-header {
+        border-bottom: 1px solid #deded6;
+        background: #fbfbf8;
+        padding: 14px 16px;
+      }
+
+      .sample-header p {
+        margin-top: 4px;
+        color: #676b73;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .sample-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      pre {
+        min-height: 260px;
+        margin: 0;
+        overflow: auto;
+        border-right: 1px solid #deded6;
+        background: #fffdf7;
+        padding: 14px;
+        color: #202124;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 12px;
+        line-height: 1.45;
+        white-space: pre;
+      }
+
+      .preview {
+        min-height: 260px;
+        position: relative;
+        overflow: hidden;
+        background-image:
+          linear-gradient(#f0f0ea 1px, transparent 1px),
+          linear-gradient(90deg, #f0f0ea 1px, transparent 1px);
+        background-size: 24px 24px;
+      }
+
+      .node {
+        position: absolute;
+        min-width: 82px;
+        border: 2px solid #202124;
+        border-radius: 6px;
+        background: #ffffff;
+        padding: 9px 10px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .node.round {
+        border-radius: 999px;
+      }
+
+      .node.decision {
+        width: 82px;
+        min-width: 82px;
+        height: 82px;
+        display: grid;
+        place-items: center;
+        transform: rotate(45deg);
+      }
+
+      .node.decision span {
+        transform: rotate(-45deg);
+      }
+
+      .node.db {
+        border-radius: 50% / 18%;
+      }
+
+      .blue {
+        background: #e8f0fe;
+      }
+
+      .green {
+        background: #e9f5eb;
+      }
+
+      .yellow {
+        background: #fff6df;
+      }
+
+      .pink {
+        background: #f8e8ef;
+      }
+
+      .edge {
+        position: absolute;
+        height: 2px;
+        background: #202124;
+        transform-origin: left center;
+      }
+
+      .edge::after {
+        content: "";
+        position: absolute;
+        right: -1px;
+        top: -5px;
+        border-left: 10px solid #202124;
+        border-top: 6px solid transparent;
+        border-bottom: 6px solid transparent;
+      }
+
+      .label {
+        position: absolute;
+        border: 1px solid #deded6;
+        border-radius: 999px;
+        background: #ffffff;
+        padding: 3px 7px;
+        color: #3c4043;
+        font-size: 11px;
+      }
+
+      .notes {
+        border-top: 1px solid #deded6;
+        padding: 12px 16px;
+        color: #676b73;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .limit-box {
+        border: 1px solid #deded6;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 16px;
+      }
+
+      .limit-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .limit-box ul {
+        margin: 10px 0 0;
+        padding-left: 20px;
+        color: #3c4043;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 980px) {
+        .sample-grid,
+        .sample-body,
+        .limit-grid {
+          grid-template-columns: 1fr;
+        }
+
+        pre {
+          border-right: 0;
+          border-bottom: 1px solid #deded6;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Mermaid Flowchart Samples for a First Converter</h1>
+      <p class="subtitle">
+        These examples show the kind of compact Mermaid output we can ask AI to generate,
+        then convert into editable Excalidraw boxes, labels, and arrows. The first pass
+        would focus on simple flowcharts only.
+      </p>
+      <div class="support-strip">
+        <span class="pill">flowchart LR / TD</span>
+        <span class="pill">A[Rectangle]</span>
+        <span class="pill">A(Rounded)</span>
+        <span class="pill">A{Decision}</span>
+        <span class="pill">A[(Database)]</span>
+        <span class="pill">A --&gt; B</span>
+        <span class="pill">A --&gt;|label| B</span>
+      </div>
+    </header>
+
+    <main>
+      <h2 class="section-title">Supported Diagram Patterns</h2>
+
+      <div class="sample-grid">
+        <article class="sample">
+          <div class="sample-header">
+            <h3>1. Linear Process</h3>
+            <p>A simple left-to-right workflow. Very safe for AI and easy to convert.</p>
+          </div>
+          <div class="sample-body">
+            <pre><code>flowchart LR
+  A[Lead captured] --> B[Qualified]
+  B --> C[Demo booked]
+  C --> D[Proposal sent]
+  D --> E[Closed won]</code></pre>
+            <div class="preview">
+              <div class="node blue" style="left: 18px; top: 105px">Lead</div>
+              <div class="node" style="left: 130px; top: 105px">Qualified</div>
+              <div class="node yellow" style="left: 255px; top: 105px">Demo</div>
+              <div class="node" style="left: 365px; top: 105px">Proposal</div>
+              <div class="edge" style="left: 100px; top: 124px; width: 28px"></div>
+              <div class="edge" style="left: 220px; top: 124px; width: 33px"></div>
+              <div class="edge" style="left: 333px; top: 124px; width: 30px"></div>
+            </div>
+          </div>
+          <p class="notes">Good for sales flows, onboarding, approval processes, lifecycle diagrams.</p>
+        </article>
+
+        <article class="sample">
+          <div class="sample-header">
+            <h3>2. Decision Branch</h3>
+            <p>One decision node with labeled yes/no edges.</p>
+          </div>
+          <div class="sample-body">
+            <pre><code>flowchart TD
+  A[Ticket created] --> B{Urgent?}
+  B -->|yes| C[Page on-call]
+  B -->|no| D[Add to queue]
+  C --> E[Resolve]
+  D --> E</code></pre>
+            <div class="preview">
+              <div class="node blue" style="left: 160px; top: 20px">Ticket</div>
+              <div class="node decision yellow" style="left: 170px; top: 92px"><span>Urgent?</span></div>
+              <div class="node pink" style="left: 45px; top: 205px">Page</div>
+              <div class="node green" style="left: 290px; top: 205px">Queue</div>
+              <div class="edge" style="left: 207px; top: 62px; width: 38px; transform: rotate(90deg)"></div>
+              <div class="edge" style="left: 168px; top: 165px; width: 94px; transform: rotate(142deg)"></div>
+              <div class="edge" style="left: 250px; top: 165px; width: 94px; transform: rotate(38deg)"></div>
+              <div class="label" style="left: 110px; top: 168px">yes</div>
+              <div class="label" style="left: 292px; top: 168px">no</div>
+            </div>
+          </div>
+          <p class="notes">Good for triage, routing, exception handling, qualification logic.</p>
+        </article>
+
+        <article class="sample">
+          <div class="sample-header">
+            <h3>3. Hub and Spoke</h3>
+            <p>Multiple sources converging into one platform, then splitting into services.</p>
+          </div>
+          <div class="sample-body">
+            <pre><code>flowchart LR
+  SMS[SMS] --> Twilio[Twilio]
+  Voice[Voice] --> Twilio
+  WhatsApp[WhatsApp] --> Twilio
+  Twilio --> Studio[Studio]
+  Twilio --> Flex[Flex]
+  Twilio --> Functions[Functions]</code></pre>
+            <div class="preview">
+              <div class="node" style="left: 18px; top: 35px">SMS</div>
+              <div class="node" style="left: 18px; top: 105px">Voice</div>
+              <div class="node" style="left: 18px; top: 175px">WhatsApp</div>
+              <div class="node blue" style="left: 180px; top: 105px">Twilio</div>
+              <div class="node yellow" style="left: 345px; top: 35px">Studio</div>
+              <div class="node green" style="left: 345px; top: 105px">Flex</div>
+              <div class="node pink" style="left: 345px; top: 175px">Functions</div>
+              <div class="edge" style="left: 100px; top: 55px; width: 92px; transform: rotate(25deg)"></div>
+              <div class="edge" style="left: 100px; top: 124px; width: 78px"></div>
+              <div class="edge" style="left: 100px; top: 194px; width: 92px; transform: rotate(-25deg)"></div>
+              <div class="edge" style="left: 262px; top: 124px; width: 92px; transform: rotate(-25deg)"></div>
+              <div class="edge" style="left: 262px; top: 124px; width: 80px"></div>
+              <div class="edge" style="left: 262px; top: 124px; width: 92px; transform: rotate(25deg)"></div>
+            </div>
+          </div>
+          <p class="notes">Good for platform maps, channel ingress, integration overviews.</p>
+        </article>
+
+        <article class="sample">
+          <div class="sample-header">
+            <h3>4. API Request Lifecycle</h3>
+            <p>Application layer, service layer, database, and response path.</p>
+          </div>
+          <div class="sample-body">
+            <pre><code>flowchart LR
+  Client[Client app] --> API[API gateway]
+  API --> Auth[Auth service]
+  Auth --> Service[Business service]
+  Service --> DB[(Database)]
+  Service --> Cache[(Cache)]
+  Service --> API
+  API --> Client</code></pre>
+            <div class="preview">
+              <div class="node blue" style="left: 18px; top: 105px">Client</div>
+              <div class="node" style="left: 130px; top: 105px">API</div>
+              <div class="node yellow" style="left: 242px; top: 105px">Auth</div>
+              <div class="node green" style="left: 354px; top: 105px">Service</div>
+              <div class="node db pink" style="left: 475px; top: 55px">DB</div>
+              <div class="node db yellow" style="left: 475px; top: 160px">Cache</div>
+              <div class="edge" style="left: 100px; top: 124px; width: 28px"></div>
+              <div class="edge" style="left: 210px; top: 124px; width: 30px"></div>
+              <div class="edge" style="left: 322px; top: 124px; width: 30px"></div>
+              <div class="edge" style="left: 435px; top: 118px; width: 48px; transform: rotate(-30deg)"></div>
+              <div class="edge" style="left: 435px; top: 132px; width: 48px; transform: rotate(30deg)"></div>
+            </div>
+          </div>
+          <p class="notes">Good for backend service flows and basic architecture diagrams.</p>
+        </article>
+
+        <article class="sample">
+          <div class="sample-header">
+            <h3>5. Retry and Failure Path</h3>
+            <p>Main success path plus a labeled failure route and retry queue.</p>
+          </div>
+          <div class="sample-body">
+            <pre><code>flowchart TD
+  A[Receive webhook] --> B[Validate payload]
+  B --> C{Valid?}
+  C -->|yes| D[Process event]
+  C -->|no| E[Reject request]
+  D --> F{Success?}
+  F -->|yes| G[Mark complete]
+  F -->|no| H[Retry queue]
+  H --> D</code></pre>
+            <div class="preview">
+              <div class="node blue" style="left: 160px; top: 15px">Webhook</div>
+              <div class="node" style="left: 160px; top: 75px">Validate</div>
+              <div class="node decision yellow" style="left: 172px; top: 135px"><span>Valid?</span></div>
+              <div class="node green" style="left: 160px; top: 235px">Process</div>
+              <div class="node pink" style="left: 320px; top: 155px">Reject</div>
+              <div class="edge" style="left: 205px; top: 57px; width: 22px; transform: rotate(90deg)"></div>
+              <div class="edge" style="left: 205px; top: 117px; width: 22px; transform: rotate(90deg)"></div>
+              <div class="edge" style="left: 210px; top: 212px; width: 25px; transform: rotate(90deg)"></div>
+              <div class="edge" style="left: 255px; top: 177px; width: 65px"></div>
+              <div class="label" style="left: 258px; top: 146px">no</div>
+            </div>
+          </div>
+          <p class="notes">Good for reliability, queueing, error handling, webhook processing.</p>
+        </article>
+
+        <article class="sample">
+          <div class="sample-header">
+            <h3>6. Customer Support Escalation</h3>
+            <p>Routing from bot to specialist teams with escalation.</p>
+          </div>
+          <div class="sample-body">
+            <pre><code>flowchart LR
+  Customer[Customer] --> Bot[Support bot]
+  Bot -->|simple| Resolve[Self-service answer]
+  Bot -->|billing| Billing[Billing specialist]
+  Bot -->|technical| Agent[Support agent]
+  Agent --> Engineering[Engineering]
+  Billing --> Resolve
+  Agent --> Resolve</code></pre>
+            <div class="preview">
+              <div class="node blue" style="left: 16px; top: 112px">Customer</div>
+              <div class="node yellow" style="left: 135px; top: 112px">Bot</div>
+              <div class="node green" style="left: 310px; top: 35px">Self-serve</div>
+              <div class="node pink" style="left: 310px; top: 112px">Billing</div>
+              <div class="node" style="left: 310px; top: 190px">Agent</div>
+              <div class="node blue" style="left: 475px; top: 190px">Engineering</div>
+              <div class="edge" style="left: 97px; top: 131px; width: 36px"></div>
+              <div class="edge" style="left: 215px; top: 131px; width: 105px; transform: rotate(-32deg)"></div>
+              <div class="edge" style="left: 215px; top: 131px; width: 92px"></div>
+              <div class="edge" style="left: 215px; top: 131px; width: 105px; transform: rotate(32deg)"></div>
+              <div class="edge" style="left: 392px; top: 209px; width: 80px"></div>
+            </div>
+          </div>
+          <p class="notes">Good for contact center and operational routing diagrams.</p>
+        </article>
+
+        <article class="sample">
+          <div class="sample-header">
+            <h3>7. Data Sync</h3>
+            <p>Shows sources, transform step, warehouse, and analytics output.</p>
+          </div>
+          <div class="sample-body">
+            <pre><code>flowchart LR
+  CRM[(CRM)] --> ETL[Transform job]
+  Billing[(Billing)] --> ETL
+  Product[(Product events)] --> ETL
+  ETL --> Warehouse[(Warehouse)]
+  Warehouse --> BI[BI dashboard]
+  Warehouse --> Alerts[Alerts]</code></pre>
+            <div class="preview">
+              <div class="node db" style="left: 20px; top: 35px">CRM</div>
+              <div class="node db" style="left: 20px; top: 112px">Billing</div>
+              <div class="node db" style="left: 20px; top: 190px">Events</div>
+              <div class="node green" style="left: 180px; top: 112px">Transform</div>
+              <div class="node db blue" style="left: 350px; top: 112px">Warehouse</div>
+              <div class="node yellow" style="left: 500px; top: 70px">BI</div>
+              <div class="node pink" style="left: 500px; top: 155px">Alerts</div>
+              <div class="edge" style="left: 100px; top: 55px; width: 90px; transform: rotate(25deg)"></div>
+              <div class="edge" style="left: 100px; top: 132px; width: 78px"></div>
+              <div class="edge" style="left: 100px; top: 210px; width: 90px; transform: rotate(-25deg)"></div>
+              <div class="edge" style="left: 262px; top: 132px; width: 85px"></div>
+              <div class="edge" style="left: 435px; top: 124px; width: 75px; transform: rotate(-22deg)"></div>
+              <div class="edge" style="left: 435px; top: 138px; width: 75px; transform: rotate(22deg)"></div>
+            </div>
+          </div>
+          <p class="notes">Good for data architecture and batch/streaming diagrams.</p>
+        </article>
+
+        <article class="sample">
+          <div class="sample-header">
+            <h3>8. Small System Map</h3>
+            <p>A compact dependency map that still fits simple nodes and edges.</p>
+          </div>
+          <div class="sample-body">
+            <pre><code>flowchart TD
+  Web[Web app] --> API[Backend API]
+  Mobile[Mobile app] --> API
+  API --> Auth[Auth provider]
+  API --> Payments[Payments]
+  API --> DB[(Database)]
+  API --> Queue[Job queue]
+  Queue --> Worker[Worker]</code></pre>
+            <div class="preview">
+              <div class="node blue" style="left: 85px; top: 25px">Web</div>
+              <div class="node blue" style="left: 250px; top: 25px">Mobile</div>
+              <div class="node green" style="left: 168px; top: 105px">API</div>
+              <div class="node yellow" style="left: 25px; top: 200px">Auth</div>
+              <div class="node pink" style="left: 145px; top: 200px">Payments</div>
+              <div class="node db" style="left: 285px; top: 200px">DB</div>
+              <div class="node" style="left: 405px; top: 200px">Queue</div>
+              <div class="edge" style="left: 140px; top: 67px; width: 82px; transform: rotate(38deg)"></div>
+              <div class="edge" style="left: 275px; top: 67px; width: 82px; transform: rotate(142deg)"></div>
+              <div class="edge" style="left: 210px; top: 147px; width: 82px; transform: rotate(142deg)"></div>
+              <div class="edge" style="left: 210px; top: 147px; width: 52px; transform: rotate(105deg)"></div>
+              <div class="edge" style="left: 255px; top: 147px; width: 82px; transform: rotate(38deg)"></div>
+              <div class="edge" style="left: 255px; top: 147px; width: 130px; transform: rotate(25deg)"></div>
+            </div>
+          </div>
+          <p class="notes">Good for lightweight architecture diagrams without advanced grouping.</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">First-Pass Converter Boundaries</h2>
+      <div class="limit-grid">
+        <section class="limit-box">
+          <h3>Good candidates</h3>
+          <ul>
+            <li>Process flows</li>
+            <li>Decision trees</li>
+            <li>Routing diagrams</li>
+            <li>API request paths</li>
+            <li>Data pipeline diagrams</li>
+            <li>Simple system dependency maps</li>
+          </ul>
+        </section>
+        <section class="limit-box">
+          <h3>Skip initially</h3>
+          <ul>
+            <li>Subgraphs and swimlanes</li>
+            <li>Sequence diagrams</li>
+            <li>Class diagrams</li>
+            <li>Custom Mermaid styling</li>
+            <li>Markdown-heavy labels</li>
+            <li>Complex curved or multi-segment routing</li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

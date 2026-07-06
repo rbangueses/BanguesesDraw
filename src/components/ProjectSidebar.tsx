@@ -1,4 +1,5 @@
-import { Copy, Eye, EyeOff, FolderPlus, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Copy, Eye, EyeOff, FolderPlus, Pencil, Search, Trash2 } from "lucide-react";
 import type { ProjectSummary } from "../types/designs";
 
 type ProjectSidebarProps = {
@@ -30,14 +31,20 @@ export function ProjectSidebar({
   onDuplicateProject,
   onDeleteProject,
 }: ProjectSidebarProps) {
-  const visibleProjects = presentationMode
+  const [projectFilter, setProjectFilter] = useState("");
+  const visibleProjectsBeforeSearch = presentationMode
     ? projects.filter(
         (project) =>
           project.name === selectedProject || isVisibleInPresentationMode(project),
       )
     : projects;
+  const visibleProjects = projectFilter.trim()
+    ? visibleProjectsBeforeSearch.filter((project) =>
+        project.name.toLowerCase().includes(projectFilter.trim().toLowerCase()),
+      )
+    : visibleProjectsBeforeSearch;
   const hiddenProjectCount = presentationMode
-    ? projects.length - visibleProjects.length
+    ? projects.length - visibleProjectsBeforeSearch.length
     : 0;
   const presentationModeTitle = presentationMode
     ? "Stop presentation mode"
@@ -46,7 +53,7 @@ export function ProjectSidebar({
   return (
     <aside className="project-sidebar">
       <div className="sidebar-header">
-        <h1>BanguesesDraw</h1>
+        <h1>DesignBuddy</h1>
         <div className="sidebar-header-actions">
           <button
             type="button"
@@ -74,6 +81,17 @@ export function ProjectSidebar({
           {hiddenProjectCount === 1 ? "project" : "projects"} hidden
         </p>
       ) : null}
+      <label className="project-search">
+        <Search size={15} aria-hidden="true" />
+        <span className="visually-hidden">Search projects</span>
+        <input
+          type="search"
+          value={projectFilter}
+          onChange={(event) => setProjectFilter(event.target.value)}
+          placeholder="Search projects"
+          aria-label="Search projects"
+        />
+      </label>
       <nav aria-label="Projects">
         {visibleProjects.map((project) => (
           <div

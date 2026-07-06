@@ -30,6 +30,7 @@ const PRESENTATION_MODE_STORAGE_KEY = "banguesesdraw.presentationMode";
 
 type PendingAction =
   | { type: "create-project" }
+  | { type: "create-note" }
   | { type: "create-design" }
   | { type: "create-mermaid-design" }
   | { type: "create-ai-design" }
@@ -74,10 +75,10 @@ export function LibraryView({
   const closeDialog = () => setPendingAction(null);
   const designImportFilters = [
     {
-      name: "BanguesesDraw designs",
+      name: "DesignBuddy artifacts",
       extensions: aiSettings.enableMermaid
-        ? ["excalidraw", "json", "mmd"]
-        : ["excalidraw", "json"],
+        ? ["excalidraw", "json", "mmd", "bdnote"]
+        : ["excalidraw", "json", "bdnote"],
     },
   ];
 
@@ -115,8 +116,11 @@ export function LibraryView({
 
       if (event.key === "1") {
         event.preventDefault();
+        setPendingAction({ type: "create-note" });
+      } else if (event.key === "2") {
+        event.preventDefault();
         setPendingAction({ type: "create-design" });
-      } else if (event.key === "2" && aiSettings.enableMermaid) {
+      } else if (event.key === "3" && aiSettings.enableMermaid) {
         event.preventDefault();
         setPendingAction({ type: "create-mermaid-design" });
       }
@@ -130,6 +134,8 @@ export function LibraryView({
     const exportFilters =
       design.kind === "mermaid"
         ? [{ name: "Mermaid", extensions: ["mmd"] }]
+        : design.kind === "note"
+          ? [{ name: "DesignBuddy note", extensions: ["bdnote"] }]
         : [{ name: "Excalidraw", extensions: ["excalidraw"] }];
     const targetPath = await save({
       title: "Export design",
@@ -185,6 +191,7 @@ export function LibraryView({
             filter={library.filter}
             enableMermaid={aiSettings.enableMermaid}
             onFilterChange={library.setFilter}
+            onCreateNote={() => setPendingAction({ type: "create-note" })}
             onCreateDesign={() => setPendingAction({ type: "create-design" })}
             onCreateMermaidDesign={() =>
               setPendingAction({ type: "create-mermaid-design" })
@@ -215,6 +222,21 @@ export function LibraryView({
           onSubmit={async (name) => {
             await library.createProject(name);
             closeDialog();
+          }}
+        />
+      ) : null}
+      {pendingAction?.type === "create-note" ? (
+        <RenameDialog
+          title="Create Note"
+          inputLabel="Note name"
+          submitLabel="Create"
+          onCancel={closeDialog}
+          onSubmit={async (name) => {
+            const design = await library.createDesign(name, "note");
+            closeDialog();
+            if (design) {
+              onOpenDesign(design.project, design.fileName);
+            }
           }}
         />
       ) : null}

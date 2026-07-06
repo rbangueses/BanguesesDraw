@@ -1,12 +1,12 @@
 [package]
-name = "banguesesdraw"
+name = "designbuddy"
 version = "0.1.0"
 description = "Local Excalidraw design manager"
-authors = ["BanguesesDraw"]
+authors = ["DesignBuddy"]
 edition = "2021"
 
 [lib]
-name = "banguesesdraw_lib"
+name = "designbuddy_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

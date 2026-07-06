@@ -22,7 +22,7 @@ vi.mock("./components/LibraryView", () => ({
     onOpenDesign: (project: string, fileName: string) => void;
   }) => (
     <section aria-label="Design library">
-      <h1>BanguesesDraw</h1>
+      <h1>DesignBuddy</h1>
       <p>Selected hint: {initialSelectedProject ?? "none"}</p>
       {openError ? <div>{openError}</div> : null}
       <button
@@ -36,6 +36,12 @@ vi.mock("./components/LibraryView", () => ({
         onClick={() => onOpenDesign("App", "Flow.mmd")}
       >
         Open Mermaid design
+      </button>
+      <button
+        type="button"
+        onClick={() => onOpenDesign("App", "Notes.bdnote")}
+      >
+        Open note
       </button>
       <button
         type="button"
@@ -115,6 +121,32 @@ vi.mock("./components/MermaidEditorView", () => ({
   ),
 }));
 
+vi.mock("./components/NoteEditorView", () => ({
+  NoteEditorView: ({
+    project,
+    fileName,
+    initialContent,
+    onBack,
+  }: {
+    project: string;
+    fileName: string;
+    initialContent: {
+      type: "banguesesdraw-note";
+      content: { type: string };
+    };
+    onBack: () => void;
+  }) => (
+    <section aria-label="Note editor">
+      <p>
+        {project} / {fileName} / {initialContent.content.type}
+      </p>
+      <button type="button" onClick={onBack}>
+        Back
+      </button>
+    </section>
+  ),
+}));
+
 describe("App", () => {
   beforeEach(() => {
     vi.mocked(designApi.readDesign).mockReset();
@@ -132,7 +164,7 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "BanguesesDraw" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "DesignBuddy" })).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Open sample design" }));
 
@@ -140,7 +172,7 @@ describe("App", () => {
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 
-    expect(screen.getByRole("heading", { name: "BanguesesDraw" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "DesignBuddy" })).toBeVisible();
   });
 
   it("returns to the project that opened the artifact", async () => {
@@ -166,7 +198,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Open sample design" }));
 
     expect(await screen.findByText("Flow.excalidraw: Error: Permission denied")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "BanguesesDraw" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "DesignBuddy" })).toBeVisible();
     expect(screen.queryByLabelText("Editor")).not.toBeInTheDocument();
   });
 
@@ -200,6 +232,29 @@ describe("App", () => {
     );
   });
 
+  it("opens rich text notes in the note editor", async () => {
+    const user = userEvent.setup();
+    vi.mocked(designApi.readDesign).mockResolvedValueOnce({
+      project: "App",
+      name: "Notes",
+      fileName: "Notes.bdnote",
+      kind: "note",
+      content: {
+        type: "banguesesdraw-note",
+        version: 1,
+        content: { type: "doc", content: [] },
+      },
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Open note" }));
+
+    expect(screen.getByLabelText("Note editor")).toHaveTextContent(
+      "App / Notes.bdnote / doc",
+    );
+  });
+
   it("rejects unsupported artifacts instead of opening an editor", async () => {
     const user = userEvent.setup();
     vi.mocked(designApi.readDesign).mockResolvedValueOnce({
@@ -214,8 +269,9 @@ describe("App", () => {
 
     await user.click(screen.getByRole("button", { name: "Open sample design" }));
 
-    expect(await screen.findByText("Flow.excalidraw: Error: Unsupported design type.")).toBeVisible();
+    expect(await screen.findByText("Flow.excalidraw: Error: Unsupported note content.")).toBeVisible();
     expect(screen.queryByLabelText("Editor")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Mermaid editor")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Note editor")).not.toBeInTheDocument();
   });
 });

@@ -1,3 +1,3 @@
 fn main() {
-    banguesesdraw_lib::run();
+    designbuddy_lib::run();
 }

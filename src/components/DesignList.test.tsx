@@ -12,6 +12,7 @@ describe("DesignList", () => {
         totalDesignCount={2}
         filter="site"
         onFilterChange={vi.fn()}
+        onCreateNote={vi.fn()}
         onCreateDesign={vi.fn()}
         onCreateMermaidDesign={vi.fn()}
         onCreateAiDesign={vi.fn()}
@@ -37,6 +38,7 @@ describe("DesignList", () => {
         totalDesignCount={0}
         filter=""
         onFilterChange={vi.fn()}
+        onCreateNote={vi.fn()}
         onCreateDesign={vi.fn()}
         onCreateMermaidDesign={vi.fn()}
         onCreateAiDesign={vi.fn()}
@@ -73,6 +75,7 @@ describe("DesignList", () => {
         totalDesignCount={1}
         filter=""
         onFilterChange={vi.fn()}
+        onCreateNote={vi.fn()}
         onCreateDesign={vi.fn()}
         onCreateMermaidDesign={vi.fn()}
         onCreateAiDesign={vi.fn()}
@@ -108,6 +111,7 @@ describe("DesignList", () => {
         totalDesignCount={0}
         filter=""
         onFilterChange={vi.fn()}
+        onCreateNote={vi.fn()}
         onCreateDesign={vi.fn()}
         onCreateMermaidDesign={vi.fn()}
         onCreateAiDesign={vi.fn()}
@@ -126,11 +130,20 @@ describe("DesignList", () => {
     expect(onImportDesign).toHaveBeenCalledTimes(1);
   });
 
-  it("shows diagram type labels and creation actions in shortcut order", () => {
+  it("shows diagram type labels and creation actions in a New menu", async () => {
+    const user = userEvent.setup();
+
     render(
       <DesignList
         project="Docs"
         designs={[
+          {
+            project: "Docs",
+            name: "Notes",
+            fileName: "Notes.bdnote",
+            kind: "note",
+            updatedAtMs: 3,
+          },
           {
             project: "Docs",
             name: "Canvas",
@@ -149,6 +162,7 @@ describe("DesignList", () => {
         totalDesignCount={2}
         filter=""
         onFilterChange={vi.fn()}
+        onCreateNote={vi.fn()}
         onCreateDesign={vi.fn()}
         onCreateMermaidDesign={vi.fn()}
         onCreateAiDesign={vi.fn()}
@@ -162,25 +176,17 @@ describe("DesignList", () => {
       />,
     );
 
+    await user.click(screen.getByRole("button", { name: "New" }));
+
     expect(
-      screen.getByRole("button", { name: /new mermaid/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /new excalidraw/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /new note/i })).not.toBeInTheDocument();
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Note1", "Excalidraw2", "Mermaid3"]);
     expect(
-      screen
-        .getAllByRole("button")
-        .filter((button) => /^new /i.test(button.textContent ?? ""))
-        .map((button) =>
-          button.querySelector(".create-action-label")?.textContent?.trim(),
-        ),
-    ).toEqual(["New Excalidraw", "New Mermaid"]);
-    expect(
-      screen.getAllByText(/[12]/, { selector: ".shortcut-keycap" }).map((keycap) => keycap.textContent),
-    ).toEqual(["1", "2"]);
-    expect(screen.getByText("Excalidraw")).toBeInTheDocument();
-    expect(screen.getByText("Mermaid")).toBeInTheDocument();
-    expect(screen.queryByText("Note")).not.toBeInTheDocument();
+      screen.getAllByText(/[123]/, { selector: ".shortcut-keycap" }).map((keycap) => keycap.textContent),
+    ).toEqual(["1", "2", "3"]);
+    expect(screen.getByText("Excalidraw", { selector: ".design-kind" })).toBeInTheDocument();
+    expect(screen.getByText("Mermaid", { selector: ".design-kind" })).toBeInTheDocument();
+    expect(screen.getByText("Note", { selector: ".design-kind" })).toBeInTheDocument();
   });
 
   it("hides the new Mermaid action when Mermaid is disabled", () => {
@@ -200,6 +206,7 @@ describe("DesignList", () => {
         filter=""
         enableMermaid={false}
         onFilterChange={vi.fn()}
+        onCreateNote={vi.fn()}
         onCreateDesign={vi.fn()}
         onCreateMermaidDesign={vi.fn()}
         onCreateAiDesign={vi.fn()}
@@ -213,9 +220,7 @@ describe("DesignList", () => {
       />,
     );
 
-    expect(
-      screen.queryByRole("button", { name: /new mermaid/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New" })).toBeInTheDocument();
     expect(screen.getByText("Mermaid")).toBeInTheDocument();
   });
 });

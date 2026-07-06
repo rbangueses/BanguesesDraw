@@ -50,7 +50,7 @@ jobs:
       - name: Upload Windows bundle
         uses: actions/upload-artifact@v4
         with:
-          name: BanguesesDraw-windows
+          name: DesignBuddy-windows
           if-no-files-found: error
           path: |
             src-tauri/target/release/bundle/**/*.msi

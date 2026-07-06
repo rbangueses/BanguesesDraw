@@ -32,6 +32,7 @@ struct ProjectMetadata {
 pub enum DesignKind {
     Excalidraw,
     Mermaid,
+    Note,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -85,16 +86,34 @@ pub fn empty_scene() -> Value {
 
 const EXCALIDRAW_EXTENSION: &str = "excalidraw";
 const MERMAID_EXTENSION: &str = "mmd";
-const PROJECT_METADATA_FILE: &str = ".banguesesdraw-project.json";
+const NOTE_EXTENSION: &str = "bdnote";
+const PROJECT_METADATA_FILE: &str = ".designbuddy-project.json";
+const LEGACY_PROJECT_METADATA_FILE: &str = ".banguesesdraw-project.json";
 
 fn empty_mermaid_source() -> Value {
     json!({ "source": "flowchart LR\n" })
+}
+
+fn empty_note() -> Value {
+    json!({
+        "type": "banguesesdraw-note",
+        "version": 1,
+        "content": {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph"
+                }
+            ]
+        }
+    })
 }
 
 fn extension_for_kind(kind: &DesignKind) -> &'static str {
     match kind {
         DesignKind::Excalidraw => EXCALIDRAW_EXTENSION,
         DesignKind::Mermaid => MERMAID_EXTENSION,
+        DesignKind::Note => NOTE_EXTENSION,
     }
 }
 
@@ -102,6 +121,7 @@ fn kind_from_path(path: &Path) -> Option<DesignKind> {
     match path.extension().and_then(|extension| extension.to_str()) {
         Some(EXCALIDRAW_EXTENSION) => Some(DesignKind::Excalidraw),
         Some(MERMAID_EXTENSION) => Some(DesignKind::Mermaid),
+        Some(NOTE_EXTENSION) => Some(DesignKind::Note),
         _ => None,
     }
 }
@@ -172,13 +192,25 @@ fn project_metadata_path(project_path: &Path) -> PathBuf {
     project_path.join(PROJECT_METADATA_FILE)
 }
 
+fn legacy_project_metadata_path(project_path: &Path) -> PathBuf {
+    project_path.join(LEGACY_PROJECT_METADATA_FILE)
+}
+
 fn read_project_metadata(project_path: &Path) -> Result<ProjectMetadata, DesignError> {
     let path = project_metadata_path(project_path);
-    if !path.exists() {
-        return Ok(ProjectMetadata::default());
+    if path.exists() {
+        return Ok(serde_json::from_str(&fs::read_to_string(path)?)?);
     }
 
-    Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
+    let legacy_path = legacy_project_metadata_path(project_path);
+    if legacy_path.exists() {
+        let metadata = serde_json::from_str(&fs::read_to_string(&legacy_path)?)?;
+        write_project_metadata(project_path, &metadata)?;
+        let _ = fs::remove_file(legacy_path);
+        return Ok(metadata);
+    }
+
+    Ok(ProjectMetadata::default())
 }
 
 fn write_project_metadata(
@@ -319,10 +351,37 @@ fn validate_mermaid(value: &Value) -> Result<(), DesignError> {
     }
 }
 
+fn validate_note(value: &Value) -> Result<(), DesignError> {
+    if !value.is_object() {
+        return Err(DesignError::InvalidDesignFile(
+            "note must be a JSON object".to_string(),
+        ));
+    }
+
+    if value.get("type").and_then(Value::as_str) != Some("banguesesdraw-note") {
+        return Err(DesignError::InvalidDesignFile(
+            "missing type=banguesesdraw-note".to_string(),
+        ));
+    }
+
+    let content = value
+        .get("content")
+        .ok_or_else(|| DesignError::InvalidDesignFile("missing note content".to_string()))?;
+
+    if !content.is_object() || content.get("type").and_then(Value::as_str) != Some("doc") {
+        return Err(DesignError::InvalidDesignFile(
+            "note content must be a TipTap document".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
 fn validate_content(kind: &DesignKind, value: &Value) -> Result<(), DesignError> {
     match kind {
         DesignKind::Excalidraw => validate_scene(value),
         DesignKind::Mermaid => validate_mermaid(value),
+        DesignKind::Note => validate_note(value),
     }
 }
 
@@ -429,7 +488,9 @@ pub fn backup_library(root: &Path, target: &Path) -> Result<BackupResult, Design
 
             let source_path = project_entry.path();
             let file_name = project_entry.file_name();
-            let is_metadata = file_name.to_string_lossy() == PROJECT_METADATA_FILE;
+            let file_name_text = file_name.to_string_lossy();
+            let is_metadata = file_name_text == PROJECT_METADATA_FILE
+                || file_name_text == LEGACY_PROJECT_METADATA_FILE;
             if is_metadata || is_design_file(&source_path) {
                 fs::copy(&source_path, target_project.join(file_name))?;
                 file_count += 1;
@@ -512,6 +573,7 @@ pub fn create_design(
     let content = match kind {
         DesignKind::Excalidraw => empty_scene(),
         DesignKind::Mermaid => empty_mermaid_source(),
+        DesignKind::Note => empty_note(),
     };
     write_design(
         root,
@@ -544,6 +606,11 @@ pub fn read_design(
             validate_mermaid(&content)?;
             content
         }
+        DesignKind::Note => {
+            let content: Value = serde_json::from_str(&fs::read_to_string(&path)?)?;
+            validate_note(&content)?;
+            content
+        }
     };
     let file_name = path.file_name().unwrap().to_string_lossy().to_string();
     Ok(DesignScene {
@@ -574,7 +641,9 @@ pub fn write_design(
 
     let tmp_path = path.with_extension(format!("{}.tmp", extension_for_kind(&kind)));
     match kind {
-        DesignKind::Excalidraw => fs::write(&tmp_path, serde_json::to_string_pretty(content)?)?,
+        DesignKind::Excalidraw | DesignKind::Note => {
+            fs::write(&tmp_path, serde_json::to_string_pretty(content)?)?
+        }
         DesignKind::Mermaid => {
             let source = content
                 .get("source")
@@ -671,12 +740,19 @@ pub fn import_design(
             validate_mermaid(&content)?;
             content
         }
+        DesignKind::Note => {
+            let content: Value = serde_json::from_str(&fs::read_to_string(source_path)?)?;
+            validate_note(&content)?;
+            content
+        }
     };
 
     let preferred_name = design_name_from_path(source_path)?;
     let target = unique_design_path(root, project, &preferred_name, &kind)?;
     match kind {
-        DesignKind::Excalidraw => fs::write(&target, serde_json::to_string_pretty(&content)?)?,
+        DesignKind::Excalidraw | DesignKind::Note => {
+            fs::write(&target, serde_json::to_string_pretty(&content)?)?
+        }
         DesignKind::Mermaid => {
             let source = content
                 .get("source")
@@ -722,6 +798,11 @@ pub fn export_design(
             validate_mermaid(&content)?;
             content
         }
+        DesignKind::Note => {
+            let content: Value = serde_json::from_str(&fs::read_to_string(&source)?)?;
+            validate_note(&content)?;
+            content
+        }
     };
 
     if let Some(parent) = target_path.parent() {
@@ -731,7 +812,9 @@ pub fn export_design(
     }
 
     match kind {
-        DesignKind::Excalidraw => fs::write(target_path, serde_json::to_string_pretty(&content)?)?,
+        DesignKind::Excalidraw | DesignKind::Note => {
+            fs::write(target_path, serde_json::to_string_pretty(&content)?)?
+        }
         DesignKind::Mermaid => {
             let source = content
                 .get("source")
@@ -812,6 +895,27 @@ mod tests {
 
         let duplicated = duplicate_project(&root, "Reference", "Reference Copy").unwrap();
         assert!(duplicated.visible_in_presentation_mode);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn migrates_legacy_project_metadata_filename() {
+        let root = test_root("legacy-project-metadata");
+        let project_path = root.join("Reference");
+        fs::create_dir_all(&project_path).unwrap();
+        fs::write(
+            project_path.join(".banguesesdraw-project.json"),
+            r#"{"visibleInPresentationMode":true}"#,
+        )
+        .unwrap();
+
+        let projects = list_projects(&root).unwrap();
+
+        assert_eq!(projects[0].name, "Reference");
+        assert!(projects[0].visible_in_presentation_mode);
+        assert!(project_path.join(".designbuddy-project.json").exists());
+        assert!(!project_path.join(".banguesesdraw-project.json").exists());
 
         fs::remove_dir_all(root).unwrap();
     }
@@ -953,6 +1057,47 @@ mod tests {
             updated.content,
             json!({ "source": "flowchart LR\n  A[Start] --> B[Done]\n" })
         );
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reads_and_writes_rich_text_notes() {
+        let root = test_root("note-read-write");
+        create_project(&root, "Discovery").unwrap();
+        let design = create_design(&root, "Discovery", "Meeting notes", DesignKind::Note).unwrap();
+
+        assert_eq!(design.kind, DesignKind::Note);
+        assert_eq!(design.file_name, "Meeting notes.bdnote");
+        assert_eq!(design.content["type"], "banguesesdraw-note");
+
+        let updated = json!({
+            "type": "banguesesdraw-note",
+            "version": 1,
+            "content": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Bold idea",
+                                "marks": [{ "type": "bold" }]
+                            }
+                        ]
+                    }
+                ]
+            }
+        });
+        write_design(&root, "Discovery", "Meeting notes.bdnote", &updated).unwrap();
+
+        let read = read_design(&root, "Discovery", "Meeting notes.bdnote").unwrap();
+        assert_eq!(read.content, updated);
+
+        let designs = list_designs(&root, "Discovery").unwrap();
+        assert_eq!(designs.len(), 1);
+        assert_eq!(designs[0].kind, DesignKind::Note);
 
         fs::remove_dir_all(root).unwrap();
     }

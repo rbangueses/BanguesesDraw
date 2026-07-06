@@ -48,11 +48,11 @@ jobs:
         run: npm exec tauri build
 
       - name: Verify macOS app signature
-        run: codesign --verify --deep --strict --verbose=4 src-tauri/target/release/bundle/macos/BanguesesDraw.app
+        run: codesign --verify --deep --strict --verbose=4 src-tauri/target/release/bundle/macos/DesignBuddy.app
 
       - name: Upload macOS bundle
         uses: actions/upload-artifact@v4
         with:
-          name: BanguesesDraw-macos
+          name: DesignBuddy-macos
           if-no-files-found: error
           path: src-tauri/target/release/bundle/**/*.dmg

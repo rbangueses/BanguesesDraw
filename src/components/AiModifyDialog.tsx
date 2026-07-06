@@ -8,8 +8,13 @@ import {
   type AiQuality,
   type AiSettings,
 } from "../lib/aiSettings";
+import {
+  AI_OUTPUT_BUDGET_OPTIONS,
+  type AiOutputBudget,
+} from "../lib/aiTokenBudget";
 import { modifyExcalidrawScene } from "../lib/openaiDiagram";
 import type { ExcalidrawScene } from "../types/excalidraw";
+import { AiGenerationEstimate } from "./AiGenerationEstimate";
 import { useDialogEscape } from "./useDialogEscape";
 
 type AiModifyDialogProps = {
@@ -31,27 +36,53 @@ export function AiModifyDialog({
   );
   const [customModel, setCustomModel] = useState(settings.customModel);
   const [quality, setQuality] = useState<AiQuality>(settings.quality);
+  const [outputBudget, setOutputBudget] =
+    useState<AiOutputBudget>("standard");
   const [error, setError] = useState<string | null>(null);
+  const [isConfirmingEstimate, setIsConfirmingEstimate] = useState(false);
   const [isModifying, setIsModifying] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const instructionId = useId();
   const modelId = useId();
   const customModelId = useId();
   const qualityId = useId();
+  const outputBudgetId = useId();
   const errorId = useId();
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  function validateRequest() {
     const trimmedInstruction = instruction.trim();
 
     if (!settings.apiKey.trim()) {
       setError("Add your OpenAI API key in AI settings first.");
-      return;
+      return null;
     }
 
     if (!trimmedInstruction) {
       setError("Describe how to modify the diagram.");
+      return null;
+    }
+
+    return trimmedInstruction;
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const trimmedInstruction = validateRequest();
+
+    if (!trimmedInstruction) {
+      return;
+    }
+
+    setError(null);
+    setIsConfirmingEstimate(true);
+  }
+
+  async function handleConfirmModify() {
+    const trimmedInstruction = validateRequest();
+
+    if (!trimmedInstruction) {
+      setIsConfirmingEstimate(false);
       return;
     }
 
@@ -64,6 +95,7 @@ export function AiModifyDialog({
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
+    setIsConfirmingEstimate(false);
     setIsModifying(true);
     setError(null);
 
@@ -72,6 +104,7 @@ export function AiModifyDialog({
         apiKey: settings.apiKey.trim(),
         model,
         quality,
+        outputBudget,
         instruction: trimmedInstruction,
         scene,
         signal: abortController.signal,
@@ -89,6 +122,11 @@ export function AiModifyDialog({
   function handleCancel() {
     if (isModifying) {
       abortControllerRef.current?.abort();
+      return;
+    }
+
+    if (isConfirmingEstimate) {
+      setIsConfirmingEstimate(false);
       return;
     }
 
@@ -147,6 +185,23 @@ export function AiModifyDialog({
                 ))}
               </select>
             </div>
+            <div>
+              <label htmlFor={outputBudgetId}>Output token budget</label>
+              <select
+                id={outputBudgetId}
+                value={outputBudget}
+                onChange={(event) => {
+                  setOutputBudget(event.target.value as AiOutputBudget);
+                  setIsConfirmingEstimate(false);
+                }}
+              >
+                {AI_OUTPUT_BUDGET_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {selectedModel === "custom" ? (
@@ -167,13 +222,35 @@ export function AiModifyDialog({
             </p>
           ) : null}
 
+          {isConfirmingEstimate ? (
+            <AiGenerationEstimate
+              kind="excalidraw"
+              quality={quality}
+              outputBudget={outputBudget}
+              isModify
+              promptLength={instruction.trim().length}
+            />
+          ) : null}
+
           <div className="dialog-actions">
             <button type="button" onClick={handleCancel}>
               Cancel
             </button>
-            <button type="submit" disabled={isModifying}>
-              {isModifying ? "Modifying..." : "Modify"}
-            </button>
+            {isConfirmingEstimate ? (
+              <button
+                type="button"
+                disabled={isModifying}
+                onClick={() => {
+                  void handleConfirmModify();
+                }}
+              >
+                Modify anyway
+              </button>
+            ) : (
+              <button type="submit" disabled={isModifying}>
+                {isModifying ? "Modifying..." : "Modify"}
+              </button>
+            )}
           </div>
         </form>
       </section>

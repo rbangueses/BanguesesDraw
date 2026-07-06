@@ -10,9 +10,16 @@ import {
 } from "../lib/aiSettings";
 import { validateDisplayName } from "../lib/designNames";
 import {
+  analyzeDiagramPrompt,
   generateExcalidrawScene,
   generateMermaidFlowchart,
+  type DiagramPromptAnalysis,
 } from "../lib/openaiDiagram";
+import {
+  AI_OUTPUT_BUDGET_OPTIONS,
+  type AiOutputBudget,
+  type AiOutputKind,
+} from "../lib/aiTokenBudget";
 import type { ExcalidrawScene } from "../types/excalidraw";
 import { useDialogEscape } from "./useDialogEscape";
 
@@ -38,23 +45,32 @@ export function AiDiagramDialog({
   );
   const [customModel, setCustomModel] = useState(settings.customModel);
   const [quality, setQuality] = useState<AiQuality>(settings.quality);
-  const [outputMode, setOutputMode] = useState<"excalidraw" | "mermaid">(
-    "excalidraw",
-  );
+  const [outputBudget, setOutputBudget] =
+    useState<AiOutputBudget>("standard");
+  const [outputMode, setOutputMode] = useState<AiOutputKind>("excalidraw");
   const enableMermaid = settings.enableMermaid;
+  const effectiveOutputMode = enableMermaid ? outputMode : "excalidraw";
   const [error, setError] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<DiagramPromptAnalysis | null>(null);
+  const [optimizedPrompt, setOptimizedPrompt] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const nameId = useId();
   const promptId = useId();
+  const optimizedPromptId = useId();
   const modelId = useId();
   const customModelId = useId();
   const qualityId = useId();
+  const outputBudgetId = useId();
   const errorId = useId();
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function resetAnalysis() {
+    setAnalysis(null);
+    setOptimizedPrompt("");
+  }
 
+  function validateRequest() {
     const trimmedPrompt = prompt.trim();
     const nameValidation = validateDisplayName(name);
 
@@ -70,6 +86,78 @@ export function AiDiagramDialog({
 
     if (!trimmedPrompt) {
       setError("Describe the diagram to generate.");
+      return null;
+    }
+
+    return trimmedPrompt;
+  }
+
+  async function handleAnalyzePrompt(sourcePrompt?: string) {
+    const trimmedPrompt = validateRequest();
+    const promptToAnalyze = sourcePrompt?.trim() || trimmedPrompt;
+
+    if (!promptToAnalyze) {
+      return;
+    }
+
+    const model = resolveAiModel({
+      ...settings,
+      selectedModel,
+      customModel,
+      quality,
+    });
+
+    setIsAnalyzing(true);
+    setError(null);
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    try {
+      const nextAnalysis = await analyzeDiagramPrompt({
+        apiKey: settings.apiKey.trim(),
+        model,
+        description: promptToAnalyze,
+        signal: abortController.signal,
+      });
+      const nextOutputMode =
+        enableMermaid || nextAnalysis.recommendedKind === "excalidraw"
+          ? nextAnalysis.recommendedKind
+          : "excalidraw";
+
+      setAnalysis({ ...nextAnalysis, recommendedKind: nextOutputMode });
+      setOptimizedPrompt(nextAnalysis.optimizedPrompt);
+      setOutputMode(nextOutputMode);
+      setQuality(nextAnalysis.recommendedQuality);
+      setOutputBudget(nextAnalysis.recommendedBudget);
+    } catch (analyzeError) {
+      setError(
+        analyzeError instanceof Error
+          ? analyzeError.message
+          : String(analyzeError),
+      );
+    } finally {
+      abortControllerRef.current = null;
+      setIsAnalyzing(false);
+    }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!analysis) {
+      void handleAnalyzePrompt();
+      return;
+    }
+
+    void handleConfirmGeneration();
+  }
+
+  async function handleConfirmGeneration() {
+    const trimmedPrompt = validateRequest();
+    const finalPrompt = optimizedPrompt.trim() || trimmedPrompt;
+
+    if (!finalPrompt) {
+      setError("Review the optimized prompt before generating.");
       return;
     }
 
@@ -86,12 +174,12 @@ export function AiDiagramDialog({
     abortControllerRef.current = abortController;
 
     try {
-      if (enableMermaid && outputMode === "mermaid") {
+      if (effectiveOutputMode === "mermaid") {
         const source = await generateMermaidFlowchart({
           apiKey: settings.apiKey.trim(),
           model,
           quality,
-          description: trimmedPrompt,
+          description: finalPrompt,
           signal: abortController.signal,
         });
 
@@ -101,7 +189,8 @@ export function AiDiagramDialog({
           apiKey: settings.apiKey.trim(),
           model,
           quality,
-          prompt: trimmedPrompt,
+          outputBudget,
+          prompt: finalPrompt,
           signal: abortController.signal,
         });
 
@@ -120,7 +209,7 @@ export function AiDiagramDialog({
   }
 
   function handleCancel() {
-    if (isGenerating) {
+    if (isGenerating || isAnalyzing) {
       abortControllerRef.current?.abort();
       return;
     }
@@ -152,7 +241,10 @@ export function AiDiagramDialog({
           <textarea
             id={promptId}
             value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
+            onChange={(event) => {
+              setPrompt(event.target.value);
+              resetAnalysis();
+            }}
             rows={6}
           />
 
@@ -162,7 +254,9 @@ export function AiDiagramDialog({
                 type="button"
                 className={outputMode === "excalidraw" ? "active" : ""}
                 aria-pressed={outputMode === "excalidraw"}
-                onClick={() => setOutputMode("excalidraw")}
+                onClick={() => {
+                  setOutputMode("excalidraw");
+                }}
               >
                 Excalidraw
               </button>
@@ -170,7 +264,9 @@ export function AiDiagramDialog({
                 type="button"
                 className={outputMode === "mermaid" ? "active" : ""}
                 aria-pressed={outputMode === "mermaid"}
-                onClick={() => setOutputMode("mermaid")}
+                onClick={() => {
+                  setOutputMode("mermaid");
+                }}
               >
                 Mermaid
               </button>
@@ -208,6 +304,24 @@ export function AiDiagramDialog({
                 ))}
               </select>
             </div>
+            {effectiveOutputMode === "excalidraw" ? (
+              <div>
+                <label htmlFor={outputBudgetId}>Output token budget</label>
+                <select
+                  id={outputBudgetId}
+                  value={outputBudget}
+                  onChange={(event) => {
+                    setOutputBudget(event.target.value as AiOutputBudget);
+                  }}
+                >
+                  {AI_OUTPUT_BUDGET_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
 
           {selectedModel === "custom" ? (
@@ -228,13 +342,65 @@ export function AiDiagramDialog({
             </p>
           ) : null}
 
+          {analysis ? (
+            <section className="ai-recommendation">
+              <h3>AI recommendation</h3>
+              <dl>
+                <div>
+                  <dt>Recommended type</dt>
+                  <dd>
+                    {analysis.recommendedKind === "mermaid"
+                      ? "Mermaid"
+                      : "Excalidraw"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Expected output</dt>
+                  <dd>{analysis.expectedOutputTokenRange}</dd>
+                </div>
+                <div>
+                  <dt>Completion risk</dt>
+                  <dd>{analysis.completionRisk}</dd>
+                </div>
+              </dl>
+              <p>{analysis.reason}</p>
+              <label htmlFor={optimizedPromptId}>Optimized prompt</label>
+              <textarea
+                id={optimizedPromptId}
+                value={optimizedPrompt}
+                onChange={(event) => setOptimizedPrompt(event.target.value)}
+                rows={7}
+              />
+            </section>
+          ) : null}
+
           <div className="dialog-actions">
             <button type="button" onClick={handleCancel}>
               Cancel
             </button>
-            <button type="submit" disabled={isGenerating}>
-              {isGenerating ? "Generating..." : "Generate"}
-            </button>
+            {analysis ? (
+              <>
+                <button
+                  type="button"
+                  disabled={isAnalyzing || isGenerating}
+                  onClick={() => {
+                    void handleAnalyzePrompt(optimizedPrompt);
+                  }}
+                >
+                  {isAnalyzing ? "Analyzing..." : "Re-analyze"}
+                </button>
+                <button type="submit" disabled={isGenerating || isAnalyzing}>
+                  {isGenerating ? "Generating..." : "Generate"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="submit"
+                disabled={isGenerating || isAnalyzing}
+              >
+                {isAnalyzing ? "Analyzing..." : "Analyze prompt"}
+              </button>
+            )}
           </div>
         </form>
       </section>

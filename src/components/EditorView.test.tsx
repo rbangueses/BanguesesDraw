@@ -651,6 +651,7 @@ describe("EditorView", () => {
       "Add an observability box",
     );
     await user.click(screen.getByRole("button", { name: "Modify" }));
+    await user.click(screen.getByRole("button", { name: "Modify anyway" }));
 
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  analyzeDiagramPrompt,
   generateExcalidrawScene,
   generateMermaidFlowchart,
   modifyExcalidrawScene,
@@ -62,6 +63,57 @@ describe("openaiDiagram", () => {
     expect(JSON.stringify(requestBody)).toContain("compact");
   });
 
+  it("analyzes a diagram prompt and returns generation recommendations", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output_text: JSON.stringify({
+          recommendedKind: "mermaid",
+          recommendedQuality: "balanced",
+          recommendedBudget: "standard",
+          expectedOutputTokenRange: "5k-10k",
+          completionRisk: "low",
+          reason: "The request has many components but can fit a compact flowchart.",
+          optimizedPrompt: "Create a compact flowchart with two lanes.",
+        }),
+      }),
+    } as Response);
+
+    await expect(
+      analyzeDiagramPrompt({
+        apiKey: "sk-test",
+        model: "gpt-5.4-mini",
+        description: "Show all Twilio components for marketing and support",
+      }),
+    ).resolves.toEqual({
+      recommendedKind: "mermaid",
+      recommendedQuality: "balanced",
+      recommendedBudget: "standard",
+      expectedOutputTokenRange: "5k-10k",
+      completionRisk: "Low",
+      reason: "The request has many components but can fit a compact flowchart.",
+      optimizedPrompt: "Create a compact flowchart with two lanes.",
+    });
+
+    const requestBody = JSON.parse(
+      String(vi.mocked(fetch).mock.calls[0]?.[1]?.body),
+    ) as {
+      max_output_tokens: number;
+      reasoning: { effort: string };
+      input: Array<{
+        role: string;
+        content: Array<{ text: string }>;
+      }>;
+    };
+    const systemMessage = requestBody.input.find((item) => item.role === "system");
+    const systemText = systemMessage?.content[0]?.text ?? "";
+
+    expect(requestBody.max_output_tokens).toBe(1_500);
+    expect(requestBody.reasoning.effort).toBe("low");
+    expect(systemText).toContain("recommendedKind");
+    expect(systemText).toContain("optimizedPrompt");
+  });
+
   it("allows larger outputs for balanced and high quality diagrams", async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
@@ -94,6 +146,29 @@ describe("openaiDiagram", () => {
     expect(highRequestBody.max_output_tokens).toBe(40_000);
   });
 
+  it("uses the selected Excalidraw output budget when provided", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output_text: JSON.stringify(generatedScene),
+      }),
+    } as Response);
+
+    await generateExcalidrawScene({
+      apiKey: "sk-test",
+      model: "gpt-5.4-mini",
+      quality: "balanced",
+      outputBudget: "extended",
+      prompt: "A detailed routing flow",
+    });
+
+    const requestBody = JSON.parse(
+      String(vi.mocked(fetch).mock.calls[0]?.[1]?.body),
+    ) as Record<string, unknown>;
+
+    expect(requestBody.max_output_tokens).toBe(60_000);
+  });
+
   it("sends the current scene and instruction when modifying a diagram", async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
@@ -106,6 +181,7 @@ describe("openaiDiagram", () => {
       apiKey: "sk-test",
       model: "gpt-5.4-mini",
       quality: "balanced",
+      outputBudget: "maximum",
       instruction: "Add an observability box",
       scene: {
         type: "excalidraw",
@@ -126,6 +202,7 @@ describe("openaiDiagram", () => {
     const userMessage = requestBody.input.find((item) => item.role === "user");
     const userText = userMessage?.content[0]?.text ?? "";
 
+    expect(requestBody).toMatchObject({ max_output_tokens: 80_000 });
     expect(userText).toContain("Modify the existing scene");
     expect(userText).toContain("Add an observability box");
     expect(userText).toContain("\"id\":\"existing\"");

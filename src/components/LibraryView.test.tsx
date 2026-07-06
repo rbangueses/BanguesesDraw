@@ -434,19 +434,35 @@ describe("LibraryView", () => {
     vi.mocked(useDesignLibrary).mockReturnValue(library);
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          output_text: JSON.stringify({
-            type: "excalidraw",
-            version: 2,
-            source: "openai",
-            elements: [{ id: "one", type: "rectangle" }],
-            appState: {},
-            files: {},
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            output_text: JSON.stringify({
+              recommendedKind: "excalidraw",
+              recommendedQuality: "balanced",
+              recommendedBudget: "standard",
+              expectedOutputTokenRange: "10k-20k",
+              completionRisk: "medium",
+              reason: "A simple auth flow works well as an Excalidraw diagram.",
+              optimizedPrompt: "Draw a simple auth flow with compact labels.",
+            }),
           }),
-        }),
-      }),
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            output_text: JSON.stringify({
+              type: "excalidraw",
+              version: 2,
+              source: "openai",
+              elements: [{ id: "one", type: "rectangle" }],
+              appState: {},
+              files: {},
+            }),
+          }),
+        } as Response),
     );
 
     render(<LibraryView onOpenDesign={vi.fn()} />);
@@ -478,6 +494,10 @@ describe("LibraryView", () => {
       within(dialog).getByLabelText("Diagram description"),
       "Draw a simple auth flow",
     );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Analyze prompt" }),
+    );
+    expect(await within(dialog).findByText("AI recommendation")).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Generate" }));
 
     await waitFor(() =>
@@ -536,15 +556,31 @@ describe("LibraryView", () => {
     vi.mocked(useDesignLibrary).mockReturnValue(library);
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockImplementation(
-        (_url, init) =>
-          new Promise((_resolve, reject) => {
-            const signal = init?.signal as AbortSignal | undefined;
-            signal?.addEventListener("abort", () => {
-              reject(new DOMException("Aborted", "AbortError"));
-            });
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            output_text: JSON.stringify({
+              recommendedKind: "excalidraw",
+              recommendedQuality: "balanced",
+              recommendedBudget: "standard",
+              expectedOutputTokenRange: "10k-20k",
+              completionRisk: "medium",
+              reason: "This can be generated as a compact Excalidraw diagram.",
+              optimizedPrompt: "Draw a Twilio routing flow with compact labels.",
+            }),
           }),
-      ),
+        } as Response)
+        .mockImplementationOnce(
+          (_url, init) =>
+            new Promise((_resolve, reject) => {
+              const signal = init?.signal as AbortSignal | undefined;
+              signal?.addEventListener("abort", () => {
+                reject(new DOMException("Aborted", "AbortError"));
+              });
+            }),
+        ),
     );
     localStorage.setItem(
       "banguesesdraw.aiSettings",
@@ -565,6 +601,10 @@ describe("LibraryView", () => {
       within(dialog).getByLabelText("Diagram description"),
       "Draw a Twilio routing flow",
     );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Analyze prompt" }),
+    );
+    expect(await within(dialog).findByText("AI recommendation")).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Generate" }));
 
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeEnabled();

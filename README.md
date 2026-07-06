@@ -35,6 +35,26 @@ DesignBuddy is a local-first desktop project workspace powered by Excalidraw. It
 
 ![DesignBuddy drawing editor](docs/screenshots/drawing-editor.png)
 
+### Notes Editor
+
+![DesignBuddy notes editor](docs/screenshots/note-editor.png)
+
+### AI Diagram Prompt
+
+![DesignBuddy AI diagram prompt](docs/screenshots/ai-diagram-dialog.png)
+
+### AI Recommendation
+
+![DesignBuddy AI recommendation](docs/screenshots/ai-recommendation.png)
+
+### Mermaid Editor
+
+![DesignBuddy Mermaid editor](docs/screenshots/mermaid-editor.png)
+
+### Mermaid Converted To Excalidraw
+
+![DesignBuddy Mermaid converted to Excalidraw](docs/screenshots/mermaid-converted-excalidraw.png)
+
 ### Twilio Components
 
 ![DesignBuddy Twilio components picker](docs/screenshots/twilio-components.png)
@@ -42,10 +62,6 @@ DesignBuddy is a local-first desktop project workspace powered by Excalidraw. It
 ### Settings And Backup
 
 ![DesignBuddy settings and backup](docs/screenshots/settings-backup.png)
-
-### AI Modify
-
-![DesignBuddy AI modify dialog](docs/screenshots/ai-modify.png)
 
 ## Local Storage
 

@@ -38,6 +38,40 @@ function textElement(scene: ReturnType<typeof mermaidToExcalidrawScene>, text: s
   return element as Record<string, unknown>;
 }
 
+function rectangleElements(scene: ReturnType<typeof mermaidToExcalidrawScene>) {
+  return scene.elements.filter(
+    (element) =>
+      typeof element === "object" &&
+      element !== null &&
+      "id" in element &&
+      typeof element.id === "string" &&
+      element.id.startsWith("node-") &&
+      "type" in element &&
+      (element.type === "rectangle" || element.type === "diamond"),
+  ) as Array<Record<string, unknown>>;
+}
+
+function elementBounds(element: Record<string, unknown>) {
+  return {
+    x: Number(element.x),
+    y: Number(element.y),
+    width: Number(element.width),
+    height: Number(element.height),
+  };
+}
+
+function overlaps(
+  left: { x: number; y: number; width: number; height: number },
+  right: { x: number; y: number; width: number; height: number },
+) {
+  return (
+    left.x < right.x + right.width &&
+    left.x + left.width > right.x &&
+    left.y < right.y + right.height &&
+    left.y + left.height > right.y
+  );
+}
+
 describe("mermaidToExcalidrawScene", () => {
   it("creates a valid Excalidraw scene from a simple flowchart", () => {
     const scene = mermaidToExcalidrawScene(
@@ -150,5 +184,61 @@ describe("mermaidToExcalidrawScene", () => {
 
     expect(Number(conversationLabel.width)).toBeGreaterThanOrEqual(220);
     expect(Number(summariesLabel.width)).toBeGreaterThanOrEqual(220);
+  });
+
+  it("keeps edge labels clear of nodes in a simple call-flow conversion", () => {
+    const scene = mermaidToExcalidrawScene(
+      [
+        "flowchart LR",
+        "CALLER[Caller] -->|dials number| PSTN[PSTN/Carrier]",
+        "PSTN -->|routes call| TWILIO[Twilio]",
+        "TWILIO -->|starts media stream| BACKEND[Backend]",
+        "BACKEND -->|receives and processes audio| TWILIO",
+      ].join("\n"),
+    );
+    const nodeBounds = rectangleElements(scene).map(elementBounds);
+
+    ["dials number", "routes call", "starts media stream", "receives and processes audio"].forEach(
+      (label) => {
+        const labelBounds = elementBounds(textElement(scene, label));
+        const overlappingNode = nodeBounds.find((nodeBound) => overlaps(labelBounds, nodeBound));
+
+        expect(overlappingNode).toBeUndefined();
+      },
+    );
+  });
+
+  it("converts cyclic AI-generated Mermaid without invalid arrow geometry", () => {
+    const scene = mermaidToExcalidrawScene(
+      [
+        "flowchart TD",
+        "ENTRY[Entry point]",
+        "ORCH[Orchestrator]",
+        "MEM[(Memory)]",
+        "CI[Conversation Intelligence]",
+        "ENTRY --> ORCH",
+        "ORCH --> MEM",
+        "MEM --> CI",
+        "CI --> ORCH",
+      ].join("\n"),
+    );
+    const arrows = scene.elements.filter(
+      (element) =>
+        typeof element === "object" &&
+        element !== null &&
+        "type" in element &&
+        element.type === "arrow",
+    ) as Array<Record<string, unknown>>;
+
+    expect(isExcalidrawScene(scene)).toBe(true);
+    expect(arrows).toHaveLength(4);
+    arrows.forEach((arrow) => {
+      expect(Number.isFinite(arrow.x)).toBe(true);
+      expect(Number.isFinite(arrow.y)).toBe(true);
+      expect(Number.isFinite(arrow.width)).toBe(true);
+      expect(Number.isFinite(arrow.height)).toBe(true);
+      expect(Number(arrow.width)).toBeGreaterThanOrEqual(0);
+      expect(Number(arrow.height)).toBeGreaterThanOrEqual(0);
+    });
   });
 });

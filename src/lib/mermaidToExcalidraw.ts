@@ -1,13 +1,72 @@
+import { layout as dagreLayout } from "dagre-d3-es/src/dagre/index.js";
+import { Graph } from "dagre-d3-es/src/graphlib/index.js";
 import { prepareSceneForStorage } from "./excalidrawScene";
 import { parseMermaidFlowchart, type ParsedMermaidNode } from "./mermaidFlowchart";
 import type { ExcalidrawScene } from "../types/excalidraw";
 
 type Element = Record<string, unknown>;
 
-const NODE_WIDTH = 260;
+type LayoutNode = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type LayoutEdge = {
+  points?: Array<{ x: number; y: number }>;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  labeloffset?: number;
+  labelpos?: string;
+};
+
+const MIN_NODE_WIDTH = 220;
+const MAX_NODE_WIDTH = 360;
 const NODE_HEIGHT = 76;
-const GAP = 90;
 const NODE_LABEL_PADDING = 16;
+const EDGE_LABEL_FONT_SIZE = 16;
+const EDGE_LABEL_HEIGHT = 24;
+const EDGE_LABEL_PADDING = 8;
+const GRAPH_MARGIN = 40;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function estimatedTextWidth(text: string, fontSize: number) {
+  const longestLineLength = text
+    .split("\n")
+    .reduce((longest, line) => Math.max(longest, line.length), 0);
+
+  return Math.max(70, Math.ceil(longestLineLength * fontSize * 0.65));
+}
+
+function nodeSize(node: ParsedMermaidNode) {
+  return {
+    x: 0,
+    y: 0,
+    width: clamp(
+      estimatedTextWidth(node.label, 20) + NODE_LABEL_PADDING * 2,
+      MIN_NODE_WIDTH,
+      MAX_NODE_WIDTH,
+    ),
+    height: NODE_HEIGHT,
+  };
+}
+
+function edgeLabelSize(label: string | undefined) {
+  if (!label) {
+    return { width: 0, height: 0 };
+  }
+
+  return {
+    width: estimatedTextWidth(label, EDGE_LABEL_FONT_SIZE) + EDGE_LABEL_PADDING * 2,
+    height: EDGE_LABEL_HEIGHT,
+  };
+}
 
 function elementId(prefix: string, index: number) {
   return `${prefix}-${index.toString(36).padStart(4, "0")}`;
@@ -51,13 +110,14 @@ function textElement(
   x: number,
   y: number,
   width = Math.max(70, text.length * 8),
+  fontSize = 20,
 ): Element {
   return {
     ...baseElement(id, "text", x, y),
     width,
-    height: 24,
+    height: Math.ceil(fontSize * 1.25),
     text,
-    fontSize: 20,
+    fontSize,
     fontFamily: 5,
     textAlign: "center",
     verticalAlign: "middle",
@@ -67,141 +127,122 @@ function textElement(
   };
 }
 
-function calculateLevels(nodes: ParsedMermaidNode[], edges: { from: string; to: string }[]) {
-  const incoming = new Map(nodes.map((node) => [node.id, 0]));
-  const outgoing = new Map<string, string[]>();
+function createLayout(
+  direction: "LR" | "TD",
+  nodes: ParsedMermaidNode[],
+  edges: { from: string; to: string; label?: string }[],
+) {
+  const graph = new Graph<Record<string, unknown>, LayoutNode, LayoutEdge>({
+    directed: true,
+    multigraph: true,
+  });
+  graph.setGraph({
+    rankdir: direction,
+    nodesep: direction === "LR" ? 80 : 100,
+    ranksep: direction === "LR" ? 170 : 120,
+    edgesep: 70,
+    marginx: GRAPH_MARGIN,
+    marginy: GRAPH_MARGIN,
+    acyclicer: "greedy",
+    ranker: "network-simplex",
+  });
+  graph.setDefaultEdgeLabel(() => ({}));
 
-  for (const edge of edges) {
-    incoming.set(edge.to, (incoming.get(edge.to) ?? 0) + 1);
-    outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge.to]);
-  }
+  nodes.forEach((node) => {
+    graph.setNode(node.id, nodeSize(node));
+  });
 
-  const levels = new Map<string, number>();
-  const queue = nodes
-    .filter((node) => (incoming.get(node.id) ?? 0) === 0)
-    .map((node) => node.id);
+  edges.forEach((edge, index) => {
+    const labelSize = edgeLabelSize(edge.label);
+    graph.setEdge(
+      edge.from,
+      edge.to,
+      {
+        width: labelSize.width,
+        height: labelSize.height,
+        labeloffset: 24,
+        labelpos: "c",
+      },
+      `edge-${index}`,
+    );
+  });
 
-  if (queue.length === 0 && nodes[0]) {
-    queue.push(nodes[0].id);
-  }
+  dagreLayout(graph, {});
 
-  for (const id of queue) {
-    levels.set(id, 0);
-  }
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    const nextLevel = (levels.get(current) ?? 0) + 1;
-
-    for (const next of outgoing.get(current) ?? []) {
-      if ((levels.get(next) ?? -1) < nextLevel) {
-        levels.set(next, nextLevel);
-        queue.push(next);
-      }
-    }
-  }
-
-  for (const node of nodes) {
-    if (!levels.has(node.id)) {
-      levels.set(node.id, levels.size);
-    }
-  }
-
-  return levels;
+  return graph;
 }
 
-function orderNodesByLevel(
-  nodes: ParsedMermaidNode[],
-  edges: { from: string; to: string }[],
-  levels: Map<string, number>,
+function pointFromLayoutNode(node: LayoutNode, side: "left" | "right" | "top" | "bottom") {
+  if (side === "left") {
+    return { x: node.x - node.width / 2, y: node.y };
+  }
+
+  if (side === "right") {
+    return { x: node.x + node.width / 2, y: node.y };
+  }
+
+  if (side === "top") {
+    return { x: node.x, y: node.y - node.height / 2 };
+  }
+
+  return { x: node.x, y: node.y + node.height / 2 };
+}
+
+function edgeEndpoints(
+  direction: "LR" | "TD",
+  from: LayoutNode,
+  to: LayoutNode,
+  layoutEdge: LayoutEdge | undefined,
 ) {
-  const originalIndex = new Map(nodes.map((node, index) => [node.id, index]));
-  const incoming = new Map<string, string[]>();
-  const levelsByDepth = new Map<number, ParsedMermaidNode[]>();
-  const orderedIndex = new Map<string, number>();
+  const points = layoutEdge?.points;
 
-  for (const edge of edges) {
-    incoming.set(edge.to, [...(incoming.get(edge.to) ?? []), edge.from]);
+  if (points && points.length >= 2) {
+    return {
+      start: points[0],
+      end: points[points.length - 1],
+    };
   }
 
-  for (const node of nodes) {
-    const level = levels.get(node.id) ?? 0;
-    levelsByDepth.set(level, [...(levelsByDepth.get(level) ?? []), node]);
+  if (direction === "LR") {
+    return {
+      start: pointFromLayoutNode(from, from.x <= to.x ? "right" : "left"),
+      end: pointFromLayoutNode(to, from.x <= to.x ? "left" : "right"),
+    };
   }
 
-  const orderedLevels = Array.from(levelsByDepth.entries())
-    .sort(([left], [right]) => left - right)
-    .map(([level, levelNodes]) => {
-      const orderedNodes = [...levelNodes].sort((left, right) => {
-        if (level === 0) {
-          return (originalIndex.get(left.id) ?? 0) - (originalIndex.get(right.id) ?? 0);
-        }
-
-        const leftParents = incoming.get(left.id) ?? [];
-        const rightParents = incoming.get(right.id) ?? [];
-        const leftParentAverage =
-          leftParents.reduce(
-            (sum, parent) => sum + (orderedIndex.get(parent) ?? originalIndex.get(parent) ?? 0),
-            0,
-          ) / Math.max(1, leftParents.length);
-        const rightParentAverage =
-          rightParents.reduce(
-            (sum, parent) => sum + (orderedIndex.get(parent) ?? originalIndex.get(parent) ?? 0),
-            0,
-          ) / Math.max(1, rightParents.length);
-
-        if (leftParentAverage !== rightParentAverage) {
-          return leftParentAverage - rightParentAverage;
-        }
-
-        return (originalIndex.get(left.id) ?? 0) - (originalIndex.get(right.id) ?? 0);
-      });
-
-      orderedNodes.forEach((node, index) => orderedIndex.set(node.id, index));
-      return orderedNodes;
-    });
-
-  return orderedLevels;
+  return {
+    start: pointFromLayoutNode(from, from.y <= to.y ? "bottom" : "top"),
+    end: pointFromLayoutNode(to, from.y <= to.y ? "top" : "bottom"),
+  };
 }
 
 export function mermaidToExcalidrawScene(source: string): ExcalidrawScene {
   const parsed = parseMermaidFlowchart(source);
-  const levels = calculateLevels(parsed.nodes, parsed.edges);
-  const orderedLevels = orderNodesByLevel(parsed.nodes, parsed.edges, levels);
-  const maxLevelSize = Math.max(...orderedLevels.map((level) => level.length), 1);
-  const positions = new Map<string, { x: number; y: number }>();
-  const horizontalSpacing = NODE_WIDTH + GAP;
-  const verticalSpacing = NODE_HEIGHT + GAP;
-
-  orderedLevels.forEach((levelNodes, levelIndex) => {
-    const horizontalOffset = ((maxLevelSize - levelNodes.length) * horizontalSpacing) / 2;
-    const verticalOffset = ((maxLevelSize - levelNodes.length) * verticalSpacing) / 2;
-
-    levelNodes.forEach((node, siblingIndex) => {
-      if (parsed.direction === "LR") {
-        positions.set(node.id, {
-          x: levelIndex * horizontalSpacing,
-          y: verticalOffset + siblingIndex * verticalSpacing,
-        });
-      } else {
-        positions.set(node.id, {
-          x: horizontalOffset + siblingIndex * horizontalSpacing,
-          y: levelIndex * verticalSpacing,
-        });
-      }
-    });
-  });
+  const graph = createLayout(parsed.direction, parsed.nodes, parsed.edges);
+  const positions = new Map(
+    parsed.nodes.map((node) => {
+      const layoutNode = graph.node(node.id) ?? { ...nodeSize(node), x: 0, y: 0 };
+      return [
+        node.id,
+        {
+          ...layoutNode,
+          x: layoutNode.x - layoutNode.width / 2,
+          y: layoutNode.y - layoutNode.height / 2,
+        },
+      ] as const;
+    }),
+  );
 
   const elements: Element[] = [];
 
   parsed.nodes.forEach((node, index) => {
-    const position = positions.get(node.id) ?? { x: 0, y: 0 };
+    const position = positions.get(node.id) ?? { ...nodeSize(node), x: 0, y: 0 };
     const shapeId = elementId("node", index);
     const textId = elementId("label", index);
     elements.push({
       ...baseElement(shapeId, nodeShapeType(node), position.x, position.y),
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
+      width: position.width,
+      height: position.height,
       backgroundColor: node.shape === "database" ? "#e9f3ff" : "#fffdf3",
     });
     elements.push(
@@ -209,8 +250,8 @@ export function mermaidToExcalidrawScene(source: string): ExcalidrawScene {
         textId,
         node.label,
         position.x + NODE_LABEL_PADDING,
-        position.y + NODE_HEIGHT / 2 - 12,
-        NODE_WIDTH - NODE_LABEL_PADDING * 2,
+        position.y + position.height / 2 - 12,
+        position.width - NODE_LABEL_PADDING * 2,
       ),
     );
   });
@@ -223,29 +264,25 @@ export function mermaidToExcalidrawScene(source: string): ExcalidrawScene {
       return;
     }
 
-    const start = {
-      x: from.x + NODE_WIDTH,
-      y: from.y + NODE_HEIGHT / 2,
-    };
-    const end = {
-      x: to.x,
-      y: to.y + NODE_HEIGHT / 2,
-    };
+    const layoutEdge = graph.edge(edge.from, edge.to, `edge-${index}`);
+    const fromCenter = { ...from, x: from.x + from.width / 2, y: from.y + from.height / 2 };
+    const toCenter = { ...to, x: to.x + to.width / 2, y: to.y + to.height / 2 };
+    const { start, end } = edgeEndpoints(parsed.direction, fromCenter, toCenter, layoutEdge);
 
-    if (parsed.direction === "TD") {
-      start.x = from.x + NODE_WIDTH / 2;
-      start.y = from.y + NODE_HEIGHT;
-      end.x = to.x + NODE_WIDTH / 2;
-      end.y = to.y;
-    }
+    const bounds = {
+      x: Math.min(start.x, end.x),
+      y: Math.min(start.y, end.y),
+      width: Math.abs(end.x - start.x),
+      height: Math.abs(end.y - start.y),
+    };
 
     elements.push({
-      ...baseElement(elementId("arrow", index), "arrow", start.x, start.y),
-      width: end.x - start.x,
-      height: end.y - start.y,
+      ...baseElement(elementId("arrow", index), "arrow", bounds.x, bounds.y),
+      width: bounds.width,
+      height: bounds.height,
       points: [
-        [0, 0],
-        [end.x - start.x, end.y - start.y],
+        [start.x - bounds.x, start.y - bounds.y],
+        [end.x - bounds.x, end.y - bounds.y],
       ],
       startBinding: null,
       endBinding: null,
@@ -255,12 +292,34 @@ export function mermaidToExcalidrawScene(source: string): ExcalidrawScene {
     });
 
     if (edge.label) {
+      const labelSize = edgeLabelSize(edge.label);
+      const labelX =
+        typeof layoutEdge?.x === "number"
+          ? layoutEdge.x - labelSize.width / 2
+          : start.x + (end.x - start.x) / 2 - labelSize.width / 2;
+      const labelY =
+        typeof layoutEdge?.y === "number"
+          ? layoutEdge.y - labelSize.height / 2
+          : start.y + (end.y - start.y) / 2 - labelSize.height - 8;
+
+      elements.push({
+        ...baseElement(elementId("edge-label-bg", index), "rectangle", labelX, labelY),
+        width: labelSize.width,
+        height: labelSize.height,
+        backgroundColor: "#ffffff",
+        fillStyle: "solid",
+        strokeColor: "transparent",
+        strokeWidth: 0,
+        roughness: 0,
+      });
       elements.push(
         textElement(
           elementId("edge-label", index),
           edge.label,
-          start.x + (end.x - start.x) / 2 - Math.max(70, edge.label.length * 8) / 2,
-          start.y + (end.y - start.y) / 2 - 28,
+          labelX + EDGE_LABEL_PADDING,
+          labelY + 2,
+          labelSize.width - EDGE_LABEL_PADDING * 2,
+          EDGE_LABEL_FONT_SIZE,
         ),
       );
     }

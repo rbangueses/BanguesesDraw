@@ -16,6 +16,7 @@ DesignBuddy is a local-first desktop project workspace powered by Excalidraw. It
 - Insert ready-made Twilio architecture blocks into Excalidraw diagrams.
 - Import existing Excalidraw, Mermaid, or note files into a project.
 - Export individual artifacts for backup, sharing, or moving between machines.
+- Export Excalidraw diagrams as basic `.drawio` files for diagrams.net or Lucidchart handoff.
 - Back up the full local library to a chosen folder, including Google Drive folders.
 - Hide private projects during screen-sharing with presentation mode.
 - Mark selected projects as visible in presentation mode, useful for reference architectures.
@@ -189,8 +190,11 @@ DesignBuddy supports single-artifact import and export:
 - import `.mmd` Mermaid files into the selected project
 - import `.bdnote` note files into the selected project
 - export an individual artifact for backup or sharing
+- export an Excalidraw diagram as a basic `.drawio` file for diagrams.net or Lucidchart import
 
 If an imported artifact name already exists, DesignBuddy creates a conflict-safe copy name instead of overwriting the existing file.
+
+The draw.io export is a practical first pass intended for handoff: it preserves common editable shapes, text, diamonds, ellipses, and arrows. Freehand strokes and advanced Excalidraw-specific styling may not convert perfectly.
 
 ## App Icon
 

@@ -64,6 +64,7 @@ vi.mock("lucide-react", () => ({
   Bot: () => <span aria-hidden="true">bot</span>,
   Copy: () => <span aria-hidden="true">copy</span>,
   Download: () => <span aria-hidden="true">download</span>,
+  FileCode2: () => <span aria-hidden="true">file-code</span>,
   Pencil: () => <span aria-hidden="true">pencil</span>,
   Save: () => <span aria-hidden="true">save</span>,
   Shapes: () => <span aria-hidden="true">shapes</span>,
@@ -76,6 +77,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 vi.mock("../lib/designApi", () => ({
   designApi: {
     duplicateDesign: vi.fn(),
+    exportDrawio: vi.fn(),
     exportDesign: vi.fn(),
     readDesign: vi.fn(),
     renameDesign: vi.fn(),
@@ -108,6 +110,7 @@ describe("EditorView", () => {
     vi.mocked(designApi.readDesign).mockReset();
     vi.mocked(designApi.renameDesign).mockReset();
     vi.mocked(designApi.duplicateDesign).mockReset();
+    vi.mocked(designApi.exportDrawio).mockReset();
     vi.mocked(designApi.exportDesign).mockReset();
     vi.mocked(designApi.writeDesign).mockReset();
     vi.mocked(save).mockReset();
@@ -578,6 +581,58 @@ describe("EditorView", () => {
       expect.objectContaining({ type: "excalidraw" }),
     );
     expect(dialog).not.toBeInTheDocument();
+  });
+
+  it("exports the current scene as a draw.io file", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(save).mockResolvedValue("/tmp/Flow.drawio");
+    vi.mocked(designApi.readDesign).mockResolvedValue({
+      project: "App",
+      name: "Flow",
+      fileName: "Flow.excalidraw",
+      kind: "excalidraw",
+      content: {
+        type: "excalidraw",
+        elements: [
+          {
+            id: "box-1",
+            type: "rectangle",
+            x: 10,
+            y: 20,
+            width: 120,
+            height: 60,
+            text: "Start",
+          },
+        ],
+        appState: {},
+        files: {},
+      },
+    });
+
+    render(
+      <EditorView
+        project="App"
+        fileName="Flow.excalidraw"
+        onBack={vi.fn()}
+        onDesignMoved={vi.fn()}
+      />,
+    );
+
+    await screen.findByText("Mock Excalidraw (1)");
+    await user.click(screen.getByRole("button", { name: "Export draw.io" }));
+
+    await waitFor(() =>
+      expect(designApi.exportDrawio).toHaveBeenCalledWith(
+        "/tmp/Flow.drawio",
+        expect.stringContaining("<mxfile"),
+      ),
+    );
+    expect(save).toHaveBeenCalledWith({
+      title: "Export draw.io",
+      defaultPath: "Flow.drawio",
+      filters: [{ name: "draw.io", extensions: ["drawio"] }],
+    });
   });
 
   it("modifies the current design with AI and saves the returned scene", async () => {

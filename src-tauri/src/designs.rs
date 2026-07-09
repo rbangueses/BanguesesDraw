@@ -828,6 +828,17 @@ pub fn export_design(
     Ok(())
 }
 
+pub fn export_drawio(target_path: &Path, content: &str) -> Result<(), DesignError> {
+    if let Some(parent) = target_path.parent() {
+        if !parent.exists() {
+            return Err(DesignError::NotFound(parent.display().to_string()));
+        }
+    }
+
+    fs::write(target_path, content)?;
+    Ok(())
+}
+
 pub fn delete_design(root: &Path, project: &str, file_name: &str) -> Result<(), DesignError> {
     let path = design_path(root, project, file_name)?;
     if !path.exists() {
@@ -1283,6 +1294,19 @@ mod tests {
 
         let exported: Value = serde_json::from_str(&fs::read_to_string(&target).unwrap()).unwrap();
         assert_eq!(exported["elements"][0]["id"], "box-1");
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn exports_drawio_content_to_a_chosen_path() {
+        let root = test_root("export-drawio");
+        fs::create_dir_all(&root).unwrap();
+        let target = root.join("Flow.drawio");
+
+        export_drawio(&target, "<mxfile></mxfile>").unwrap();
+
+        assert_eq!(fs::read_to_string(&target).unwrap(), "<mxfile></mxfile>");
 
         fs::remove_dir_all(root).unwrap();
     }

@@ -175,6 +175,12 @@ fn export_design(
 }
 
 #[tauri::command]
+fn export_drawio(target_path: String, content: String) -> Result<(), String> {
+    designs::export_drawio(&PathBuf::from(target_path), &content)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn backup_library(app: tauri::AppHandle, target_path: String) -> Result<BackupResult, String> {
     designs::backup_library(&designs_root(&app)?, &PathBuf::from(target_path))
         .map_err(|error| error.to_string())
@@ -199,6 +205,7 @@ pub fn run() {
             delete_design,
             import_design,
             export_design,
+            export_drawio,
             backup_library
         ])
         .run(tauri::generate_context!())

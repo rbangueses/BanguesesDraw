@@ -1,7 +1,16 @@
 import "@excalidraw/excalidraw/index.css";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import { save } from "@tauri-apps/plugin-dialog";
-import { ArrowLeft, Bot, Copy, Download, Pencil, Save, Shapes } from "lucide-react";
+import {
+  ArrowLeft,
+  Bot,
+  Copy,
+  Download,
+  FileCode2,
+  Pencil,
+  Save,
+  Shapes,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAutosave } from "../hooks/useAutosave";
 import { loadAiSettings, type AiSettings } from "../lib/aiSettings";
@@ -10,6 +19,7 @@ import {
   prepareSceneForExcalidraw,
   prepareSceneForStorage,
 } from "../lib/excalidrawScene";
+import { exportSceneToDrawioXml } from "../lib/excalidrawToDrawio";
 import { isExcalidrawScene } from "../lib/sceneValidation";
 import {
   createTwilioComponentElements,
@@ -301,6 +311,30 @@ export function EditorView({
     }
   }, [fileName, getLatestSavedScene, project]);
 
+  const handleExportDrawio = useCallback(async () => {
+    const targetPath = await save({
+      title: "Export draw.io",
+      defaultPath: `${title}.drawio`,
+      filters: [{ name: "draw.io", extensions: ["drawio"] }],
+    });
+
+    if (typeof targetPath !== "string") {
+      return;
+    }
+
+    setIsFileActionRunning(true);
+    setLoadError(null);
+
+    try {
+      const latestScene = await getLatestSavedScene();
+      await designApi.exportDrawio(targetPath, exportSceneToDrawioXml(latestScene));
+    } catch (unknownError) {
+      setLoadError(String(unknownError));
+    } finally {
+      setIsFileActionRunning(false);
+    }
+  }, [getLatestSavedScene, title]);
+
   const handleAiModified = useCallback((scene: ExcalidrawScene) => {
     const preparedScene = prepareSceneForExcalidraw(scene);
     latestSceneRef.current = preparedScene;
@@ -406,6 +440,16 @@ export function EditorView({
             disabled={isBusy || !initialData}
           >
             <Download size={16} />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => void handleExportDrawio()}
+            aria-label="Export draw.io"
+            title="Export draw.io"
+            disabled={isBusy || !initialData}
+          >
+            <FileCode2 size={16} />
           </button>
           <span className={`save-status ${autosave.status}`}>{autosave.status}</span>
           <button

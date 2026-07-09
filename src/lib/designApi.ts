@@ -51,6 +51,8 @@ export const designApi = {
     invoke<DesignSummary>("import_design", { project, sourcePath }),
   exportDesign: (project: string, fileName: string, targetPath: string) =>
     invoke<void>("export_design", { project, fileName, targetPath }),
+  exportDrawio: (targetPath: string, content: string) =>
+    invoke<void>("export_drawio", { targetPath, content }),
   backupLibrary: (targetPath: string) =>
     invoke<BackupResult>("backup_library", { targetPath }),
 };

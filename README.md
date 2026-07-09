@@ -24,7 +24,7 @@ DesignBuddy is a local-first desktop project workspace powered by Excalidraw. It
 - Toggle Mermaid support on or off from settings.
 - Cancel dialogs with Escape.
 - Regenerate the app icon set from a reusable DesignBuddy DB source icon.
-- Build native installers for macOS and Windows.
+- Build a macOS app bundle and Windows installers.
 
 ## Screenshots
 
@@ -211,7 +211,7 @@ The Tauri build script watches the key icon files so `npm run tauri:dev` refresh
 
 ### macOS
 
-Download the `DesignBuddy-macos` artifact from GitHub Actions. Open the `.dmg` file inside the artifact and drag DesignBuddy into Applications.
+Download the `DesignBuddy-macos` artifact from GitHub Actions. Unzip it, then drag `DesignBuddy.app` into Applications.
 
 If macOS warns that Apple could not verify the app is free of malware, right-click the app in Applications and choose **Open**. This can happen because the app is ad-hoc signed but not notarized with an Apple Developer ID yet.
 
@@ -251,25 +251,37 @@ Run the app in development:
 npm run tauri:dev
 ```
 
-Build a native app bundle:
+Build native app bundles and installers:
 
 ```bash
 npm exec tauri build
 ```
 
-On macOS, the local build creates a DMG under:
+On macOS, you can also build only the app bundle:
+
+```bash
+npm exec -- tauri build --bundles app
+```
+
+The macOS app bundle is created under:
+
+```text
+src-tauri/target/release/bundle/macos/
+```
+
+The default local macOS build also creates a DMG under:
 
 ```text
 src-tauri/target/release/bundle/dmg/
 ```
 
-Open that folder:
+Open the app bundle folder:
 
 ```bash
-open src-tauri/target/release/bundle/dmg
+open src-tauri/target/release/bundle/macos
 ```
 
-Then open the `.dmg`, drag DesignBuddy into Applications, and launch it from Applications. A local build usually avoids the downloaded-artifact Gatekeeper flow, but if macOS still warns, right-click the app and choose **Open**.
+Then drag DesignBuddy into Applications and launch it from Applications. A local build usually avoids the downloaded-artifact Gatekeeper flow, but if macOS still warns, right-click the app and choose **Open**.
 
 Run tests:
 
@@ -280,7 +292,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 ## Installer Builds With GitHub Actions
 
-This repo includes GitHub Actions workflows for macOS and Windows installers:
+This repo includes GitHub Actions workflows for a macOS app bundle and Windows installers:
 
 ```text
 .github/workflows/macos-build.yml

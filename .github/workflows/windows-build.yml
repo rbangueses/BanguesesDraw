@@ -44,6 +44,10 @@ jobs:
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
+      - name: Clean stale bundle output
+        shell: pwsh
+        run: Remove-Item -Recurse -Force src-tauri/target/release/bundle -ErrorAction SilentlyContinue
+
       - name: Build Windows installer
         run: npm exec tauri build
 

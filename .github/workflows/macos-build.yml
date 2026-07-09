@@ -44,8 +44,11 @@ jobs:
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
+      - name: Clean stale bundle output
+        run: rm -rf src-tauri/target/release/bundle
+
       - name: Build macOS app
-        run: npm exec tauri build
+        run: ./node_modules/.bin/tauri build --bundles app
 
       - name: Verify macOS app signature
         run: codesign --verify --deep --strict --verbose=4 src-tauri/target/release/bundle/macos/DesignBuddy.app
@@ -55,4 +58,4 @@ jobs:
         with:
           name: DesignBuddy-macos
           if-no-files-found: error
-          path: src-tauri/target/release/bundle/**/*.dmg
+          path: src-tauri/target/release/bundle/macos/DesignBuddy.app

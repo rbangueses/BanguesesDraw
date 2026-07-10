@@ -1,5 +1,5 @@
 import { save } from "@tauri-apps/plugin-dialog";
-import { ArrowLeft, Bot, Copy, Download, Pencil, Save, Shuffle } from "lucide-react";
+import { ArrowLeft, Bot, Copy, Pencil, Save, Shuffle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { designApi } from "../lib/designApi";
 import { loadAiSettings, type AiSettings } from "../lib/aiSettings";
@@ -9,6 +9,7 @@ import { prepareSceneForExcalidraw } from "../lib/excalidrawScene";
 import { isExcalidrawScene } from "../lib/sceneValidation";
 import type { ExcalidrawScene } from "../types/excalidraw";
 import { AiMermaidModifyDialog } from "./AiMermaidModifyDialog";
+import { ExportMenu } from "./ExportMenu";
 import { MermaidPreview } from "./MermaidPreview";
 import { RenameDialog } from "./RenameDialog";
 
@@ -128,7 +129,7 @@ export function MermaidEditorView({
 
   const handleExport = useCallback(async () => {
     const targetPath = await save({
-      title: "Export design",
+      title: "Export Mermaid source",
       defaultPath: fileName,
       filters: [{ name: "Mermaid", extensions: ["mmd"] }],
     });
@@ -230,16 +231,17 @@ export function MermaidEditorView({
           >
             <Copy size={16} />
           </button>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => void handleExport()}
-            aria-label="Export design"
-            title="Export design"
+          <ExportMenu
             disabled={isBusy}
-          >
-            <Download size={16} />
-          </button>
+            items={[
+              {
+                id: "mermaid",
+                label: "Mermaid source",
+                description: ".mmd",
+                onSelect: () => void handleExport(),
+              },
+            ]}
+          />
           <button
             type="button"
             className="convert-button"

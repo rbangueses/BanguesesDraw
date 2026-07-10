@@ -62,6 +62,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 vi.mock("lucide-react", () => ({
   ArrowLeft: () => <span aria-hidden="true">arrow</span>,
   Bot: () => <span aria-hidden="true">bot</span>,
+  ChevronDown: () => <span aria-hidden="true">chevron-down</span>,
   Copy: () => <span aria-hidden="true">copy</span>,
   Download: () => <span aria-hidden="true">download</span>,
   FileCode2: () => <span aria-hidden="true">file-code</span>,
@@ -620,7 +621,8 @@ describe("EditorView", () => {
     );
 
     await screen.findByText("Mock Excalidraw (1)");
-    await user.click(screen.getByRole("button", { name: "Export draw.io" }));
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    await user.click(screen.getByRole("menuitem", { name: /draw\.io file/i }));
 
     await waitFor(() =>
       expect(designApi.exportDrawio).toHaveBeenCalledWith(
@@ -926,7 +928,8 @@ describe("EditorView", () => {
     );
 
     await user.click(await screen.findByRole("button", { name: "Edit scene" }));
-    await user.click(screen.getByRole("button", { name: "Export design" }));
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    await user.click(screen.getByRole("menuitem", { name: /Excalidraw file/i }));
 
     await waitFor(() =>
       expect(designApi.exportDesign).toHaveBeenCalledWith(

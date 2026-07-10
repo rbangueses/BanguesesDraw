@@ -5,8 +5,6 @@ import {
   ArrowLeft,
   Bot,
   Copy,
-  Download,
-  FileCode2,
   Pencil,
   Save,
   Shapes,
@@ -31,6 +29,7 @@ import {
 } from "../lib/twilioComponents";
 import type { ExcalidrawScene } from "../types/excalidraw";
 import { AiModifyDialog } from "./AiModifyDialog";
+import { ExportMenu } from "./ExportMenu";
 import { RenameDialog } from "./RenameDialog";
 import { useDialogEscape } from "./useDialogEscape";
 
@@ -431,26 +430,24 @@ export function EditorView({
           >
             <Copy size={16} />
           </button>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => void handleExport()}
-            aria-label="Export design"
-            title="Export design"
+          <ExportMenu
             disabled={isBusy || !initialData}
-          >
-            <Download size={16} />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => void handleExportDrawio()}
-            aria-label="Export draw.io"
-            title="Export draw.io"
-            disabled={isBusy || !initialData}
-          >
-            <FileCode2 size={16} />
-          </button>
+            items={[
+              {
+                id: "excalidraw",
+                label: "Excalidraw file",
+                description: ".excalidraw",
+                onSelect: () => void handleExport(),
+              },
+              {
+                id: "drawio",
+                label: "draw.io file",
+                description: ".drawio",
+                icon: "file-code",
+                onSelect: () => void handleExportDrawio(),
+              },
+            ]}
+          />
           <span className={`save-status ${autosave.status}`}>{autosave.status}</span>
           <button
             type="button"

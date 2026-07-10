@@ -6,6 +6,7 @@ DesignBuddy is a local-first desktop project workspace powered by Excalidraw. It
 
 - Create, rename, duplicate, and delete projects.
 - Create, rename, duplicate, and delete artifacts inside each project.
+- Use a responsive project workspace with searchable projects and filterable artifacts.
 - Draw with the full Excalidraw canvas experience.
 - Autosave designs locally as `.excalidraw` files.
 - Create and edit Mermaid flowcharts as local `.mmd` files.
@@ -15,11 +16,11 @@ DesignBuddy is a local-first desktop project workspace powered by Excalidraw. It
 - Convert supported Mermaid flowcharts into editable Excalidraw designs.
 - Insert ready-made Twilio architecture blocks into Excalidraw diagrams.
 - Import existing Excalidraw, Mermaid, or note files into a project.
-- Export individual artifacts for backup, sharing, or moving between machines.
-- Export Excalidraw diagrams as basic `.drawio` files for diagrams.net or Lucidchart handoff.
+- Export individual artifacts from a single **Export** menu for backup, sharing, or moving between machines.
+- Export Excalidraw diagrams as `.excalidraw` files or basic `.drawio` files for diagrams.net or Lucidchart handoff.
 - Back up the full local library to a chosen folder, including Google Drive folders.
 - Hide private projects during screen-sharing with presentation mode.
-- Mark selected projects as visible in presentation mode, useful for reference architectures.
+- Mark selected projects as visible in presentation mode using the always-visible eye button, useful for reference architectures.
 - Search projects in the sidebar and filter artifacts inside a project.
 - Toggle Mermaid support on or off from settings.
 - Cancel dialogs with Escape.
@@ -94,6 +95,7 @@ DesignBuddy adds a local design-manager layer around Excalidraw:
 - import and export
 - AI modification
 - Twilio component templates
+- export as `.excalidraw` or `.drawio` from the editor **Export** menu
 
 ## Notes
 
@@ -115,7 +117,15 @@ Notes are intentionally project-scoped. Use them for discovery notes, customer c
 
 The project sidebar includes a presentation mode toggle for screen-sharing. When enabled, private projects are hidden from the sidebar so their names are not visible and cannot be selected accidentally. The currently open project remains visible so you do not lose your place.
 
-Each project has a visibility flag in the sidebar. Use it to keep non-sensitive projects, such as reference architecture folders, visible even while presentation mode is enabled. Projects are private by default unless you mark them as visible.
+Each project has an always-visible eye button for its presentation visibility flag. Use it to keep non-sensitive projects, such as reference architecture folders, visible even while presentation mode is enabled. Projects are private by default unless you mark them as visible.
+
+Less frequent project actions live behind the project row `...` menu:
+
+- rename project
+- duplicate project
+- delete project
+
+The project list and artifact table are responsive. On wide screens the artifact list expands across the available project area; on narrower screens metadata and row actions wrap so the list stays usable.
 
 ## Keyboard Shortcuts
 
@@ -155,7 +165,8 @@ Mermaid designs have a split editor:
 - source editor on the left
 - live preview on the right
 - AI modify support
-- export/import as `.mmd`
+- import as `.mmd`
+- export from the editor **Export** menu as Mermaid source `.mmd`
 - conversion into Excalidraw when the diagram uses the supported simple flowchart subset
 
 Supported Mermaid-to-Excalidraw conversion currently focuses on simple `flowchart LR` and `flowchart TD` diagrams with basic nodes and arrows. Chained arrows and basic edge labels are supported, but complex Mermaid features such as subgraphs, styling directives, class definitions, sequence diagrams, and advanced shapes are intentionally outside the current conversion scope.
@@ -189,8 +200,13 @@ DesignBuddy supports single-artifact import and export:
 - import `.excalidraw` files into the selected project
 - import `.mmd` Mermaid files into the selected project
 - import `.bdnote` note files into the selected project
-- export an individual artifact for backup or sharing
+- export an individual artifact from its editor **Export** menu
+- export Excalidraw designs as `.excalidraw`
+- export Mermaid diagrams as `.mmd`
+- export notes as `.bdnote`
 - export an Excalidraw diagram as a basic `.drawio` file for diagrams.net or Lucidchart import
+
+The project list also keeps a quick row-level export button for the artifact's native file format. Advanced or alternate formats are available from the editor **Export** menu.
 
 If an imported artifact name already exists, DesignBuddy creates a conflict-safe copy name instead of overwriting the existing file.
 

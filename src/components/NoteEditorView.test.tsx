@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { save } from "@tauri-apps/plugin-dialog";
 import { NoteEditorView } from "./NoteEditorView";
 
 vi.mock("../lib/designApi", () => ({
@@ -69,5 +70,45 @@ describe("NoteEditorView", () => {
         }),
       ),
     );
+  });
+
+  it("exports a note from the shared export menu", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(save).mockResolvedValue("/tmp/Notes.bdnote");
+    vi.mocked(designApi.exportDesign).mockResolvedValue(undefined);
+
+    render(
+      <NoteEditorView
+        project="App"
+        fileName="Notes.bdnote"
+        initialContent={{
+          type: "banguesesdraw-note",
+          version: 1,
+          content: {
+            type: "doc",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "Hello" }] }],
+          },
+        }}
+        onBack={vi.fn()}
+        onDesignMoved={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    await user.click(screen.getByRole("menuitem", { name: /DesignBuddy note/i }));
+
+    await waitFor(() =>
+      expect(designApi.exportDesign).toHaveBeenCalledWith(
+        "App",
+        "Notes.bdnote",
+        "/tmp/Notes.bdnote",
+      ),
+    );
+    expect(save).toHaveBeenCalledWith({
+      title: "Export DesignBuddy note",
+      defaultPath: "Notes.bdnote",
+      filters: [{ name: "DesignBuddy note", extensions: ["bdnote"] }],
+    });
   });
 });

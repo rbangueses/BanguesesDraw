@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { designApi } from "../lib/designApi";
 import { MermaidEditorView } from "./MermaidEditorView";
+import { save } from "@tauri-apps/plugin-dialog";
 
 vi.mock("./MermaidPreview", () => ({
   MermaidPreview: ({ source }: { source: string }) => (
@@ -31,6 +32,7 @@ describe("MermaidEditorView", () => {
     vi.mocked(designApi.renameDesign).mockReset();
     vi.mocked(designApi.duplicateDesign).mockReset();
     vi.mocked(designApi.exportDesign).mockReset();
+    vi.mocked(save).mockReset();
   });
 
   it("edits and saves Mermaid source", async () => {
@@ -114,5 +116,38 @@ describe("MermaidEditorView", () => {
       "Flow Excalidraw.excalidraw",
       expect.any(Object),
     );
+  });
+
+  it("exports Mermaid source from the shared export menu", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(save).mockResolvedValue("/tmp/Flow.mmd");
+    vi.mocked(designApi.exportDesign).mockResolvedValue(undefined);
+
+    render(
+      <MermaidEditorView
+        project="Docs"
+        fileName="Flow.mmd"
+        initialSource="flowchart LR\n"
+        onBack={vi.fn()}
+        onDesignMoved={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    await user.click(screen.getByRole("menuitem", { name: /Mermaid source/i }));
+
+    await waitFor(() =>
+      expect(designApi.exportDesign).toHaveBeenCalledWith(
+        "Docs",
+        "Flow.mmd",
+        "/tmp/Flow.mmd",
+      ),
+    );
+    expect(save).toHaveBeenCalledWith({
+      title: "Export Mermaid source",
+      defaultPath: "Flow.mmd",
+      filters: [{ name: "Mermaid", extensions: ["mmd"] }],
+    });
   });
 });

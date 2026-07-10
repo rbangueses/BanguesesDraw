@@ -119,7 +119,8 @@ describe("LibraryView", () => {
 
     render(<LibraryView onOpenDesign={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "Duplicate App" }));
+    await user.click(screen.getByRole("button", { name: "Project actions for App" }));
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
 
     let dialog = screen.getByRole("dialog", { name: "Duplicate project" });
     let nameInput = within(dialog).getByRole("textbox", { name: "Project name" });
@@ -131,7 +132,8 @@ describe("LibraryView", () => {
       expect(library.duplicateProject).toHaveBeenCalledWith("App", "App Copy"),
     );
 
-    await user.click(screen.getByRole("button", { name: "Delete App" }));
+    await user.click(screen.getByRole("button", { name: "Project actions for App" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
 
     dialog = screen.getByRole("dialog", { name: "Delete project" });
     expect(within(dialog).getByText(/App/)).toBeVisible();
@@ -173,7 +175,8 @@ describe("LibraryView", () => {
 
     render(<LibraryView onOpenDesign={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "Delete App" }));
+    await user.click(screen.getByRole("button", { name: "Project actions for App" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
 
     const dialog = screen.getByRole("dialog", { name: "Delete project" });
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));

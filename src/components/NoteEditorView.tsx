@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Bold,
   Copy,
-  Download,
   Heading1,
   Heading2,
   Italic,
@@ -19,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type React from "react";
 import { designApi } from "../lib/designApi";
 import type { NoteDesignContent } from "../types/designs";
+import { ExportMenu } from "./ExportMenu";
 import { RenameDialog } from "./RenameDialog";
 
 type NoteEditorViewProps = {
@@ -167,7 +167,7 @@ export function NoteEditorView({
 
   const handleExport = useCallback(async () => {
     const targetPath = await save({
-      title: "Export design",
+      title: "Export DesignBuddy note",
       defaultPath: fileName,
       filters: [{ name: "DesignBuddy note", extensions: ["bdnote"] }],
     });
@@ -247,16 +247,17 @@ export function NoteEditorView({
           >
             <Copy size={16} />
           </button>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => void handleExport()}
-            aria-label="Export note"
-            title="Export note"
+          <ExportMenu
             disabled={isBusy}
-          >
-            <Download size={16} />
-          </button>
+            items={[
+              {
+                id: "designbuddy-note",
+                label: "DesignBuddy note",
+                description: ".bdnote",
+                onSelect: () => void handleExport(),
+              },
+            ]}
+          />
           <span className={`save-status ${saveStatus}`}>{saveStatus}</span>
           <button
             type="button"

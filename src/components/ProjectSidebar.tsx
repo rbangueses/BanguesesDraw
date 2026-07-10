@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { Copy, Eye, EyeOff, FolderPlus, Pencil, Search, Trash2 } from "lucide-react";
+import {
+  Copy,
+  Eye,
+  EyeOff,
+  FolderPlus,
+  MoreHorizontal,
+  Pencil,
+  Search,
+  Trash2,
+} from "lucide-react";
 import type { ProjectSummary } from "../types/designs";
 
 type ProjectSidebarProps = {
@@ -32,6 +41,7 @@ export function ProjectSidebar({
   onDeleteProject,
 }: ProjectSidebarProps) {
   const [projectFilter, setProjectFilter] = useState("");
+  const [openProjectActions, setOpenProjectActions] = useState<string | null>(null);
   const visibleProjectsBeforeSearch = presentationMode
     ? projects.filter(
         (project) =>
@@ -49,6 +59,10 @@ export function ProjectSidebar({
   const presentationModeTitle = presentationMode
     ? "Stop presentation mode"
     : "Start presentation mode";
+  const runProjectAction = (action: () => void) => {
+    setOpenProjectActions(null);
+    action();
+  };
 
   return (
     <aside className="project-sidebar">
@@ -108,60 +122,78 @@ export function ProjectSidebar({
               <span>{project.name}</span>
               <span>{project.designCount}</span>
             </button>
-            <div className="row-actions">
+            <button
+              type="button"
+              className="icon-button row-action-button project-visibility-button"
+              onClick={() =>
+                onSetProjectVisibility(
+                  project.name,
+                  !isVisibleInPresentationMode(project),
+                )
+              }
+              aria-label={
+                isVisibleInPresentationMode(project)
+                  ? `Hide ${project.name} in presentation mode`
+                  : `Show ${project.name} in presentation mode`
+              }
+              title={
+                isVisibleInPresentationMode(project)
+                  ? `Hide ${project.name} in presentation mode`
+                  : `Show ${project.name} in presentation mode`
+              }
+            >
+              {isVisibleInPresentationMode(project) ? (
+                <Eye size={16} />
+              ) : (
+                <EyeOff size={16} />
+              )}
+            </button>
+            <div className="project-actions-menu-wrap">
               <button
                 type="button"
                 className="icon-button row-action-button"
                 onClick={() =>
-                  onSetProjectVisibility(
-                    project.name,
-                    !isVisibleInPresentationMode(project),
+                  setOpenProjectActions((openProject) =>
+                    openProject === project.name ? null : project.name,
                   )
                 }
-                aria-label={
-                  isVisibleInPresentationMode(project)
-                    ? `Hide ${project.name} in presentation mode`
-                    : `Show ${project.name} in presentation mode`
-                }
-                title={
-                  isVisibleInPresentationMode(project)
-                    ? `Hide ${project.name} in presentation mode`
-                    : `Show ${project.name} in presentation mode`
-                }
+                aria-label={`Project actions for ${project.name}`}
+                aria-haspopup="menu"
+                aria-expanded={openProjectActions === project.name}
+                title={`Project actions for ${project.name}`}
               >
-                {isVisibleInPresentationMode(project) ? (
-                  <Eye size={16} />
-                ) : (
-                  <EyeOff size={16} />
-                )}
+                <MoreHorizontal size={16} />
               </button>
-              <button
-                type="button"
-                className="icon-button row-action-button"
-                onClick={() => onRenameProject(project.name)}
-                aria-label={`Rename ${project.name}`}
-                title={`Rename ${project.name}`}
-              >
-                <Pencil size={16} />
-              </button>
-              <button
-                type="button"
-                className="icon-button row-action-button"
-                onClick={() => onDuplicateProject(project.name)}
-                aria-label={`Duplicate ${project.name}`}
-                title={`Duplicate ${project.name}`}
-              >
-                <Copy size={16} />
-              </button>
-              <button
-                type="button"
-                className="icon-button row-action-button"
-                onClick={() => onDeleteProject(project.name)}
-                aria-label={`Delete ${project.name}`}
-                title={`Delete ${project.name}`}
-              >
-                <Trash2 size={16} />
-              </button>
+              {openProjectActions === project.name ? (
+                <div className="project-actions-menu" role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => runProjectAction(() => onRenameProject(project.name))}
+                  >
+                    <Pencil size={16} />
+                    Rename
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() =>
+                      runProjectAction(() => onDuplicateProject(project.name))
+                    }
+                  >
+                    <Copy size={16} />
+                    Duplicate
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => runProjectAction(() => onDeleteProject(project.name))}
+                  >
+                    <Trash2 size={16} />
+                    Delete
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         ))}

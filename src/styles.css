@@ -73,6 +73,7 @@ textarea {
 }
 
 .design-header-actions {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -112,11 +113,28 @@ textarea {
   z-index: 20;
 }
 
+.export-menu-wrap {
+  position: relative;
+  z-index: 20;
+}
+
 .create-menu {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
   width: 220px;
+  border: 1px solid #deded8;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 6px;
+  box-shadow: 0 14px 40px rgb(32 33 36 / 14%);
+}
+
+.export-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
   border: 1px solid #deded8;
   border-radius: 8px;
   background: #ffffff;
@@ -134,8 +152,44 @@ textarea {
   color: #202124;
 }
 
+.export-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-start;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 9px 10px;
+  color: #202124;
+  text-align: left;
+}
+
+.export-menu button span {
+  min-width: 0;
+}
+
+.export-menu button strong,
+.export-menu button small {
+  display: block;
+}
+
+.export-menu button strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.export-menu button small {
+  margin-top: 2px;
+  color: #676b73;
+  font-size: 12px;
+}
+
 .create-menu button:hover,
-.create-menu button:focus-visible {
+.create-menu button:focus-visible,
+.export-menu button:hover,
+.export-menu button:focus-visible {
   background: #f1f1ed;
 }
 
@@ -229,8 +283,7 @@ textarea {
 }
 
 .project-button {
-  display: flex;
-  justify-content: space-between;
+  min-width: 0;
 }
 
 .project-item,
@@ -241,23 +294,65 @@ textarea {
   border-radius: 6px;
 }
 
+.project-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: start;
+}
+
 .project-item.active,
 .project-item:hover,
 .design-row:hover {
   background: #ecebe4;
 }
 
-.project-item .row-actions {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease;
+.project-button span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.project-item:hover .row-actions,
-.project-item:focus-within .row-actions,
-.project-item.active .row-actions {
-  opacity: 1;
-  pointer-events: auto;
+.project-actions-menu-wrap {
+  position: relative;
+  padding: 6px 6px 0 0;
+}
+
+.project-visibility-button {
+  margin-top: 6px;
+}
+
+.project-actions-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 4px;
+  z-index: 30;
+  width: 220px;
+  border: 1px solid #deded8;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 6px;
+  box-shadow: 0 14px 40px rgb(32 33 36 / 14%);
+}
+
+.project-actions-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-start;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 9px 10px;
+  color: #202124;
+  text-align: left;
+}
+
+.project-actions-menu button:hover,
+.project-actions-menu button:focus-visible {
+  background: #f1f1ed;
 }
 
 .project-button,
@@ -324,7 +419,7 @@ textarea {
 }
 
 .design-panel {
-  max-width: 980px;
+  width: 100%;
 }
 
 .eyebrow {
@@ -360,7 +455,7 @@ textarea {
 
 .design-open-button {
   border-radius: 0;
-  grid-template-columns: minmax(140px, 1fr) max-content max-content;
+  grid-template-columns: minmax(220px, 1fr) max-content max-content;
 }
 
 .empty-state,
@@ -734,6 +829,23 @@ textarea {
   cursor: pointer;
 }
 
+.export-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  border: 1px solid #d7d7d0;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.export-menu-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .convert-button {
   display: inline-flex;
   align-items: center;
@@ -916,6 +1028,17 @@ textarea {
   padding: 10px 12px;
 }
 
+@media (max-width: 1120px) {
+  .design-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .design-header-actions {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 840px) {
   .library-view {
     grid-template-columns: 1fr;
@@ -930,20 +1053,36 @@ textarea {
     padding: 16px;
   }
 
-  .design-panel-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .design-header-actions {
-    justify-content: flex-start;
-  }
-
   .mermaid-editor-grid {
     grid-template-columns: 1fr;
   }
 
   .note-page {
     padding: 32px 24px;
+  }
+}
+
+@media (max-width: 720px) {
+  .design-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .design-open-button {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    row-gap: 4px;
+  }
+
+  .design-updated {
+    grid-column: 1 / -1;
+    color: #676b73;
+    font-size: 12px;
+  }
+
+  .design-row .row-actions {
+    justify-content: flex-end;
+    border-top: 1px solid #eeeeea;
+    padding: 6px 8px;
   }
 }
